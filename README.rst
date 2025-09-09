@@ -32,10 +32,11 @@ However, existing approaches in C++ and Python interoperation expose several cri
 
 **Goal:**  
 To design and implement a contiguous N-dimensional array library that:  
-- Provides O(1) index calculation with explicit `shape` and `strides`.  
-- Enables zero-copy interoperability between C++ and NumPy through the buffer protocol.  
-- Supports both fundamental scalar types and composite (struct) types, with a roadmap for SoA/columnar layouts.  
-- Offers a clean, maintainable API for both C++ and Python users.
+
+-  Provides O(1) index calculation with explicit `shape` and `strides`.  
+-  Enables zero-copy interoperability between C++ and NumPy through the buffer protocol.  
+-  Supports both fundamental scalar types and composite (struct) types, with a roadmap for SoA/columnar layouts.  
+-  Offers a clean, maintainable API for both C++ and Python users.
 
 Prospective Users
 -----------------
@@ -172,79 +173,351 @@ Extensibility roadmap (post v0.1)
 
 API Description
 ---------------
-**C++ (namespace ``cnda``).**
-- ``template<class T> class ContiguousND``:
-  - ``explicit ContiguousND(std::vector<size_t> shape)`` — allocate contiguous buffer
-  - ``const std::vector<size_t>& shape() const`` / ``strides() const`` / ``ndim() const`` / ``size() const``
-  - ``T* data()`` / ``const T* data() const``
-  - ``size_t index(std::initializer_list<size_t> idx) const`` — O(1) offset computation
-  - ``T& operator()(size_t i, size_t j, ...)`` — element access (bounds optional in Release)
+This section shows how to program against the library from **C++** and **Python**, including
+core types, function signatures, zero-copy interop, and example scripts.
 
-**Python (via pybind11).**
-- ``from_numpy(np_array) -> ContiguousND_f32/_f64/_i32/_i64`` (creates a view when layout is compatible; otherwise explicit copy)
-- ``arr.to_numpy(copy: bool = False) -> numpy.ndarray`` (returns a view by default if safe)
-- Example::
-  
-    import numpy as np, cnda
-    x = np.arange(12, dtype=np.float32).reshape(3, 4)
-    a = cnda.from_numpy(x)      # zero-copy view into x's buffer
-    y = a.to_numpy()            # returns a view (no copy)
-    assert y.ctypes.data == x.ctypes.data
+C++ API (namespace ``cnda``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Primary container
+^^^^^^^^^^^^^^^^^
+.. code-block:: cpp
+
+  namespace cnda {
+
+  template <class T>
+  class ContiguousND {
+  public:
+    // --- ctors & ownership ---
+    explicit ContiguousND(std::vector<size_t> shape);          // owning buffer
+    ContiguousND(T* data,
+                 std::vector<size_t> shape,
+                 std::vector<size_t> strides,
+                 bool owning);                                  // advanced (alias or take ownership)
+
+    // --- shape & layout ---
+    const std::vector<size_t>& shape()   const noexcept;
+    const std::vector<size_t>& strides() const noexcept;
+    size_t ndim()  const noexcept;     // rank
+    size_t size()  const noexcept;     // total elements
+
+    // --- data access ---
+    T*       data()       noexcept;
+    const T* data() const noexcept;
+
+    // --- indexing ---
+    size_t index(std::initializer_list<size_t> idx) const;      // O(1) offset
+    T& operator()(size_t i);                                    // 1-D
+    T& operator()(size_t i, size_t j);                          // 2-D
+    T& operator()(size_t i, size_t j, size_t k);                // 3-D
+    // (variadic helper overloads may be provided)
+
+    // --- misc ---
+    void fill(const T& value);                                  // utility
+  };
+
+  } // namespace cnda
+
+Basic usage
+^^^^^^^^^^^
+.. code-block:: cpp
+
+  #include "contiguous_nd.hpp"
+  #include <iostream>
+  using cnda::ContiguousND;
+
+  int main() {
+    ContiguousND<float> a({3,4});   // 3x4, row-major contiguous
+    a(1,2) = 42.0f;
+    std::cout << a(1,2) << "\n";    // prints 42
+    std::cout << a.ndim() << "D size=" << a.size() << "\n";
+    return 0;
+  }
+
+Array-of-Structs (AoS) demo
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. code-block:: cpp
+
+  struct Cell {
+    double rho, u, p;  // density, velocity, pressure
+  };
+
+  cnda::ContiguousND<Cell> grid({128, 128});
+  grid(10, 20) = Cell{1.0, 0.3, 101325.0};
+  double pressure = grid(10, 20).p;
+
+Error handling (C++)
+^^^^^^^^^^^^^^^^^^^^
+- Invalid shapes/overflow → throw ``std::invalid_argument``.
+- Mismatched strides/layout in advanced ctor → ``std::invalid_argument``.
+- Debug builds may enable bounds checks in ``operator()`` (configurable).
+
+Python API (module ``cnda`` via pybind11)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+High-level functions & types
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- ``from_numpy(arr: numpy.ndarray) -> ContiguousND_f32/_f64/_i32/_i64``  
+  Creates a **zero-copy view** if dtype/contiguity are compatible; otherwise raises, or copies when explicitly requested in a separate helper (e.g., ``from_numpy_copy``).
+- ``ContiguousND_*.to_numpy(copy: bool = False) -> numpy.ndarray``  
+  Returns a NumPy **view** by default (no copy) when safe; with ``copy=True`` returns a new array.
+
+Typical script
+^^^^^^^^^^^^^^
+.. code-block:: python
+
+  import numpy as np
+  import cnda
+
+  # 1) Start from NumPy → C++ view (no copy)
+  x = np.arange(12, dtype=np.float32).reshape(3, 4)
+  a = cnda.from_numpy(x)          # view into x's buffer
+  y = a.to_numpy()                # returns a view back
+  assert y.ctypes.data == x.ctypes.data
+
+  # 2) Modify through the C++-backed view
+  y[1, 2] = 42
+  assert x[1, 2] == 42            # reflected in original array
+
+  # 3) Allocate on C++ side (exposed to Python)
+  b = cnda.ContiguousND_f32([2, 3])   # constructor bound in pybind11
+  z = b.to_numpy()                     # NumPy view, shape (2, 3)
+  z.fill(7.0)
+  assert (z == 7.0).all()
+
+Working with dtypes and shapes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. code-block:: python
+
+  # dtype-gated constructors (examples):
+  cnda.ContiguousND_f32([64, 64])
+  cnda.ContiguousND_f64([32, 32, 16])
+
+  # Interop checks:
+  # - from_numpy expects contiguous C-order and matching dtype.
+  # - to_numpy returns a view; set copy=True to force duplication.
+
+Array-of-Structs in Python (demo concept)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+For educational purposes, an AoS example can be exposed via a typed wrapper or
+record-dtype mapping (advanced; subject to v0.1 scope). A conceptual sketch:
+
+.. code-block:: python
+
+  # Pseudocode / optional extension:
+  Cell = np.dtype([('rho', 'f8'), ('u', 'f8'), ('p', 'f8')])
+  arr  = np.zeros((128, 128), dtype=Cell)     # NumPy record array
+  # If bindings support record dtypes, cnda.from_numpy(arr) could alias it.
+
+Zero-copy rules (Python)
+^^^^^^^^^^^^^^^^^^^^^^^^
+- **from_numpy**: zero-copy only if:
+  - dtype matches the bound container type,
+  - array is C-contiguous (or an accepted stride pattern),
+  - lifetime is secured (binding retains a capsule/ref).
+- **to_numpy**: returns a view over library-owned memory with a capsule deleter; use ``copy=True`` to force duplication.
+
+Exceptions (Python)
+^^^^^^^^^^^^^^^^^^^
+- Incompatible dtype/strides/contiguity → ``ValueError``.
+- Shape/size overflow or invalid input → ``ValueError`` / ``TypeError``.
+
+End-to-end example (script)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. code-block:: python
+
+  """
+  Example: finite-difference style stencil using ContiguousND_f32 from Python.
+  """
+  import numpy as np, cnda
+
+  nx, ny = 256, 256
+  a = cnda.ContiguousND_f32([nx, ny])      # C++-owned buffer
+  A = a.to_numpy()                          # NumPy view (no copy)
+
+  # initialize
+  X, Y = np.meshgrid(np.linspace(0, 1, nx), np.linspace(0, 1, ny), indexing='ij')
+  A[:] = np.sin(2*np.pi*X) * np.sin(2*np.pi*Y)
+
+  # simple 5-point Laplacian (periodic)
+  out = np.empty_like(A)
+  out[1:-1,1:-1] = (
+      -4.0*A[1:-1,1:-1]
+      + A[2:,1:-1] + A[:-2,1:-1]
+      + A[1:-1,2:] + A[1:-1,:-2]
+  )
+
+  # pass back into C++ (still a view)
+  b = cnda.from_numpy(out)                  # zero-copy view over NumPy array
+  B = b.to_numpy()                          # view again; same buffer pointer
+  assert B.ctypes.data == out.ctypes.data
+
+Notes on extensibility
+~~~~~~~~~~~~~~~~~~~~~~
+- Future versions may add:
+  - slicing/broadcasting views,
+  - SoA (columnar) adapters and traits,
+  - custom allocators (alignment/pinning),
+  - property-based tests for API contracts.
 
 Engineering Infrastructure
 --------------------------
-**Automatic build system.**
-- CMake (>= 3.18)::
-  
-    cmake -S . -B build
+This section outlines how the project will be engineered end-to-end: build and packaging,
+version control practices, testing strategy, documentation plan, and (optionally) CI.
+
+Automatic build system
+~~~~~~~~~~~~~~~~~~~~~~
+**C++ build (CMake).**
+- Minimum: CMake >= 3.18; a C++11-capable compiler (GCC/Clang/MSVC).
+- Out-of-source configure & build::
+
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
     cmake --build build -j
 
-- (After Python binding is added) Editable install::
-  
+- Run C++ tests (via CTest)::
+
+    ctest --test-dir build --output-on-failure
+
+**Python binding (pybind11) – editable install (later milestone).**
+- Project will expose a Python module (``cnda``) via pybind11.
+- After bindings land, provide a pyproject-based editable install::
+
     python -m venv .venv
     # Windows: .\.venv\Scripts\activate
     # Linux/macOS:
     source .venv/bin/activate
     pip install -U pip
-    # pip install -e .
+    pip install -e .    # builds the extension in-place
 
-**Version control.**
-- Git + GitHub (issues, branches, pull requests).
-- Proposal and roadmap maintained in-repo and evolved via PRs.
-- Suggested branch scheme:
+- Wheels for Linux/Windows can be produced via ``cibuildwheel`` (post-v0.1).
+
+Artifacts & layout (planned)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- **Top-level files**: ``CMakeLists.txt``, ``pyproject.toml`` (later), ``README.rst``, ``LICENSE``.
+- **Sources**:
+  - ``core/contiguous_nd.hpp`` (+ ``.cpp`` if needed)
+  - ``interop/bindings.cpp`` (pybind11)
+- **Tests**:
+  - ``tests/cpp/*`` (Catch2/GoogleTest)
+  - ``tests/py/*`` (pytest)
+
+Version control
+~~~~~~~~~~~~~~~
+**Repository & branching.**
+- Host: GitHub (public).
+- Mainline: ``main`` (protected).
+- Topic branches:
   - ``feature/core-contiguousnd``
   - ``feature/pybind-zero-copy``
   - ``test/pytest-golden-numpy``
+  - ``docs/sphinx-site`` (optional)
+- Workflow: feature branch → pull request → code review → squash-merge.
 
-**Testing framework.**
-- **C++**: Catch2 or GoogleTest (via ``ctest``) for shape/strides/indexing correctness and AoS samples.
-- **Python**: ``pytest`` with NumPy as the **golden** reference (values, shapes, strides, memory sharing).
-- Ownership/lifetime stress tests to prevent dangling views or double-frees.
+**Commit practices.**
+- Conventional messages (e.g., ``feat:``, ``fix:``, ``docs:``, ``test:``, ``chore:``).
+- Small, reviewable commits; one logical change per PR.
 
-**Documentation.**
-- ``README.rst`` (this proposal), plus ``docs/`` for design notes and API examples.
-- Optional Sphinx site once APIs stabilize.
+**Issue tracking & milestones.**
+- GitHub Issues for tasks/bugs; Milestones aligned with the weekly schedule.
+- Labels: ``core``, ``interop``, ``api``, ``perf``, ``tests``, ``docs``.
 
-**Continuous integration (optional, recommended).**
-- GitHub Actions (Linux/Windows) matrix: configure → build → run C++ tests → run ``pytest``.
+Testing framework
+~~~~~~~~~~~~~~~~~
+**C++ unit tests.**
+- Framework: **Catch2** or **GoogleTest** (invoked via CTest).
+- Coverage:
+  - Shape/stride invariants and O(1) index math.
+  - Element access correctness (including debug-bounds mode).
+  - AoS demo types (POD/standard-layout structs).
+- Negative tests:
+  - Invalid shapes/overflow; layout/stride mismatches.
+
+**Python tests.**
+- Framework: **pytest**, with **NumPy** as the *golden* reference.
+- Coverage:
+  - ``from_numpy`` / ``to_numpy`` zero-copy paths (pointer equality via ``ctypes.data``).
+  - Dtype/contiguity validation (raise on incompatible inputs).
+  - Round-trip semantics (NumPy → C++ view → NumPy view).
+- Optional property-based tests (``hypothesis``) for shapes and random indexing.
+
+**Benchmarks (lightweight).**
+- Micro-benchmarks to compare raw-pointer loops vs. ``ContiguousND`` offsetting.
+- Track stable timings locally; CI perf gates are **not** required for v0.1.
+
+Documentation
+~~~~~~~~~~~~~
+**In-repo docs.**
+- ``README.rst``: serves as the proposal and quickstart.
+- ``docs/``: design notes, API examples, zero-copy policy, lifetime rules.
+- Example notebooks (Python) illustrating typical numerical workflows.
+
+**Sphinx site (optional, post-v0.1).**
+- Autodoc for C++/Python APIs (with ``breathe``/``doxygen`` integration if needed).
+- Publish via GitHub Pages.
+
+Continuous integration (optional but recommended)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- **GitHub Actions** matrix (Linux/Windows):
+  1) Checkout, set up Python
+  2) Configure & build with CMake (Release)
+  3) Run C++ tests via CTest
+  4) Install test deps (``pytest``, ``numpy``) and run Python tests
+- Artifacts: store build logs and (optionally) wheels for inspection.
 
 Schedule
 --------
-*Assume an 8-week timeline beginning 09/09 (Asia/Taipei). The initial 6 weeks are the planning/implementation phase; weeks 7–8 focus on integration and delivery. Dates denote Monday–Sunday ranges.*
+The project is planned for 8 weeks. The first 6 weeks focus on core development and planning,
+while the last 2 weeks are dedicated to integration, validation, and presentation. The schedule
+is an initial estimate and will be adjusted as development progresses.
 
-- **Planning phase (6 weeks from 09/09 to 10/20)**
+Planning phase (6 weeks)
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-  - **Week 1 (09/09–09/15):** Repository scaffold; minimal ``ContiguousND<float>`` (``shape/strides/index/data``); baseline C++ tests; draft docs.
-  - **Week 2 (09/16–09/22):** pybind11 bindings (``from_numpy``/``to_numpy``); Python smoke tests (no-copy paths); CI green.
-  - **Week 3 (09/23–09/29):** Zero-copy safety (ownership/lifetime rules); explicit copy switch; documentation refinements; micro-benchmarks vs. raw pointer.
-  - **Week 4 (09/30–10/06):** Typed instantiations (f32/f64/i32/i64); debug-only bounds checks; robust error handling; example notebook.
-  - **Week 5 (10/07–10/13):** AoS demo (array of structs) and notes on cache locality; public API polish.
-  - **Week 6 (10/14–10/20):** (Optional) SoA adapter prototype; CLI inspector; packaging and layout cleanup.
+Week 1:
+- Set up repository structure and build system (CMake).
+- Implement minimal ``ContiguousND<float>`` with shape, strides, size, and raw data access.
+- Add initial C++ unit tests for shape and indexing.
+- Draft README and proposal documents.
 
-- **Integration & delivery (2 weeks from 10/21 to 11/03)**
+Week 2:
+- Add support for multiple scalar types (float32, float64, int32, int64).
+- Implement ``operator()`` for clean element access in 1D, 2D, and 3D.
+- Introduce basic error handling (invalid shape, overflow).
+- Extend C++ test coverage.
 
-  - **Week 7 (10/21–10/27):** Freeze v0.1 API; improve tests (property-based/edge cases); slide draft for presentation.
-  - **Week 8 (10/28–11/03):** Final validation; tag **v0.1.0**; presentation materials finalized.
+Week 3:
+- Develop pybind11 bindings for ``from_numpy`` and ``to_numpy``.
+- Validate zero-copy interop with NumPy for contiguous arrays.
+- Add Python pytest suite with NumPy as golden reference.
+- Configure CI pipeline (GitHub Actions).
+
+Week 4:
+- Strengthen zero-copy safety: lifetime management, ownership policies, capsule deleters.
+- Implement explicit copy option in API for incompatible inputs.
+- Add debug-only bounds checking in C++.
+- Expand Python test cases to cover failure paths.
+
+Week 5:
+- Demonstrate support for arrays of structs (AoS) with POD types.
+- Add examples for structured grid usage in C++ and Python.
+- Run micro-benchmarks comparing pointer arithmetic vs. ``ContiguousND`` offsetting.
+- Refine API consistency.
+
+Week 6:
+- Optional: prototype Struct-of-Arrays (SoA/columnar) adapter.
+- Add CLI utility for inspecting array shape, strides, and memory address.
+- Improve documentation with design notes and usage examples.
+
+Integration & delivery (2 weeks)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Week 7:
+- Freeze v0.1 API and finalize test coverage (edge cases, property-based tests).
+- Validate interop across Linux and Windows.
+- Draft presentation slides and demo scripts.
+
+Week 8:
+- Perform final validation and polish documentation.
+- Tag and release version 0.1.0.
+- Deliver final presentation and repository submission.
 
 References
 ----------
