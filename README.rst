@@ -6,47 +6,169 @@ and **zero-copy** NumPy interoperability.
 
 Basic Information
 -----------------
-- GitHub repository: https://github.com/Linkenreefefedas/Contiguous_N-Dimensional_Array.git
-- About (one sentence): Contiguous N-D arrays with struct support and zero-copy NumPy interop in C++11/Python.
-- Additional documents: All auxiliary documents (proposal, design notes, API examples) will be added under ``docs/``.
+- GitHub Repository: https://github.com/Linkenreefefedas/Contiguous_N-Dimensional_Array.git
+- About: A lightweight C++11/Python library that provides contiguous multi-dimensional arrays with clean indexing, zero-copy NumPy interoperability, and support for both fundamental and composite (struct) types.
 
 Problem to Solve
 ----------------
-**Field/industry.** Numerical and scientific software (HPC, simulation pre/post-processing, mesh/geometry tools) frequently manipulates multi-dimensional arrays, often across a C++ compute core and a Python-facing interface.
+In scientific and numerical software, multi-dimensional arrays are fundamental data structures. 
+However, existing approaches in C++ and Python interoperation expose several critical issues:
 
-**Background.** Raw pointers and manual offset arithmetic make N-D indexing cryptic and error-prone in C++. Crossing the C++/Python boundary commonly incurs unnecessary buffer copies, harming performance and memory footprint. Handling composite types—array of structs (AoS) vs. struct of arrays (SoA, columnar)—further complicates implementation and cache behavior.
+1. **Complex indexing in C++**  
+   Multi-dimensional arrays are often represented as raw pointers in contiguous memory. 
+   Manual offset arithmetic makes the code cryptic, error-prone, and difficult to maintain.
 
-**Goal.** Provide a lightweight N-D array core with:
-- **Contiguous layout** managed by explicit ``shape`` and ``strides`` (O(1) offset computation).
-- **Zero-copy** NumPy interoperability via the buffer protocol/pybind11.
-- **Type coverage** for fundamental scalars and composite/struct types, with a path to columnar layouts.
-- A clean, maintainable API usable from both C++ and Python.
+2. **Performance and memory overhead**  
+   Sharing data between C++ and Python usually requires copying buffers. 
+   For large-scale simulations, redundant copies result in wasted memory and significant performance degradation.
 
-**Methods / numerical angle.** While not a solver, the library underpins numerics by enforcing deterministic memory layout, predictable cache locality, and constant-time index computation—prerequisites for stable performance in numerical kernels.
+3. **Lack of composite type support**  
+   Many numerical problems store multiple physical variables per grid point (e.g., density, velocity, pressure). 
+   Supporting both Array of Structs (AoS) and Struct of Arrays (SoA, columnar) layouts is essential but rarely addressed in a lightweight library.
+
+4. **Unclear API design**  
+   Users expect clean and intuitive APIs similar to NumPy’s syntax (e.g., `x[2,3,4]` in Python), 
+   but C++ implementations often expose cumbersome pointer arithmetic instead of high-level abstractions.
+
+**Goal:**  
+To design and implement a contiguous N-dimensional array library that:  
+- Provides O(1) index calculation with explicit `shape` and `strides`.  
+- Enables zero-copy interoperability between C++ and NumPy through the buffer protocol.  
+- Supports both fundamental scalar types and composite (struct) types, with a roadmap for SoA/columnar layouts.  
+- Offers a clean, maintainable API for both C++ and Python users.
 
 Prospective Users
 -----------------
-- Researchers, students, and engineers building solvers, preprocessors/postprocessors, or teaching code who need a **readable**, **tested**, and **fast** array backbone.
-- Python users who want to view/operate on C++ memory from NumPy **without copies** (and vice versa).
-- Developers exploring AoS vs. SoA trade-offs and cache effects on numeric kernels.
+The library is intended for both educational and practical use in the field of numerical and scientific computing.
+
+1. **Researchers and engineers in HPC and simulation**  
+   They require high-performance data structures to handle large grids or meshes. 
+   This library enables them to prototype algorithms in Python while relying on C++ for efficient memory management and computation, without incurring unnecessary data copies.
+
+2. **Students and educators**  
+   In courses on numerical methods, scientific computing, or software engineering, 
+   this project provides a clear and maintainable reference implementation of multi-dimensional arrays. 
+   It helps learners understand the trade-offs of memory layouts (AoS vs SoA) and the importance of cache-aware design.
+
+3. **Python developers bridging with C++**  
+   Developers who already use NumPy can seamlessly integrate this library to extend functionality or optimize performance-critical sections in C++ while preserving a NumPy-like API style.
 
 System Architecture
 -------------------
-**Workflow overview.**
-1. **Input**: Users provide shapes (and optionally strides) from C++ or pass a ``numpy.ndarray`` from Python.
-2. **Core**: A templated C++ class manages contiguous storage, shape/stride bookkeeping, and O(1) index calculation.
-3. **Interop**: pybind11 bindings create zero-copy views when layouts are compatible; controlled copies are explicit.
-4. **Output**: Results are exposed as C++ references or Python ``numpy.ndarray`` views.
+This section describes how the system ingests data, represents and transforms it in memory, exposes interfaces to users, and returns results. It also states the constraints and the modular decomposition.
 
-**Modules.**
-- ``core`` (C++11): ``cnda::ContiguousND<T>`` with RAII buffer, ``shape()``, ``strides()``, ``ndim()``, ``size()``, ``data()``, and offset/element accessors.
-- ``interop`` (pybind11): ``from_numpy`` / ``to_numpy`` (zero-copy where possible), typed Python wrappers (e.g., ``ContiguousND_f32``).
-- ``cli`` (optional): Inspect/dump shape/strides, validate sharing (for demos and debugging).
+High-level workflow
+~~~~~~~~~~~~~~~~~~~
+The following depicts the typical execution paths from both C++ and Python:
 
-**Constraints/assumptions (v0.1).**
-- Focus on correctness, zero-copy safety, and clear API before advanced features.
-- Slicing/broadcasting and full SoA adapters are **post-v0.1** goals.
-- Single-threaded semantics initially; document ownership/lifetime rules for safe interop.
+.. code-block:: text
+
+   [User Code]                                     [Library Internals]
+   -----------                                     -------------------
+   (Python) np.ndarray --from_numpy()------------> interop/pybind: validate layout
+                                                   : (zero-copy view if compatible)
+                                                   core/ContiguousND<T>: adopt external buffer
+                                                   :
+                                                   user ops via Python wrapper (indexing, access)
+                                                   :
+   to_numpy(copy=False) <-------------------------- return NumPy view (no copy if safe)
+
+   (C++)   shape vector --ContiguousND<T>(shape)-> core: allocate contiguous buffer (RAII)
+                                                   :
+                                                   user ops via C++ API (operator(), data())
+                                                   :
+   expose as NumPy (optional) --to_numpy()-------> interop/pybind: create NumPy view
+
+Inputs and outputs
+~~~~~~~~~~~~~~~~~~
+- **Inputs**
+  - From **Python**: existing ``numpy.ndarray`` (dtype, shape, strides) or requested shape for new arrays.
+  - From **C++**: a shape vector (e.g., ``{nx, ny, nz}``) and (optionally) initial values.
+- **Outputs**
+  - C++ references or values via ``operator()`` / ``data()``.
+  - **Python NumPy views** (no copies when possible) via ``to_numpy(copy=False)``.
+  - Explicit copies only when requested or when layout is incompatible with zero-copy rules.
+
+Data model and memory layout
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- **Contiguous storage** in row-major order (C-style) by default.
+- **Shape/strides** are tracked explicitly; offset computation is **O(1)**.
+- **Element type** ``T`` is templated (``float``, ``double``, ``int32_t``, ``int64_t``; extensible to POD structs).
+- **RAII ownership**: the core class either *owns* an internal buffer (allocated by the library) or *aliases* an external buffer (e.g., NumPy) without taking ownership, governed by clear lifetime rules.
+- **Alignment**: default allocator alignment the platform provides; specialized allocators may be plugged in later.
+
+Interfaces
+~~~~~~~~~~
+- **C++ (namespace ``cnda``)**:
+  - ``template<class T> class ContiguousND`` with:
+    - ``ContiguousND(std::vector<size_t> shape)`` (owning allocation)
+    - ``shape()``, ``strides()``, ``ndim()``, ``size()``, ``data()``, ``const data()``
+    - ``size_t index(std::initializer_list<size_t>)`` (offset calc)
+    - ``T& operator()(size_t i, size_t j, ...)`` (element access; debug bounds optionally)
+- **Python (module ``cnda`` via pybind11)**:
+  - ``from_numpy(np.ndarray) -> ContiguousND_*`` (view if compatible)
+  - ``obj.to_numpy(copy: bool = False) -> np.ndarray`` (view by default if safe)
+  - Thin, typed wrappers (e.g., ``ContiguousND_f32``) expose properties and indexing helpers.
+
+Module decomposition
+~~~~~~~~~~~~~~~~~~~~
+- **core/** (C++11)
+  - ``contiguous_nd.hpp/.cpp``: the ``ContiguousND<T>`` container, shape/stride handling, offset logic, ownership policy.
+  - ``detail/``: small utilities (bounds-check helpers for Debug builds, dtype traits, error categories).
+- **interop/** (pybind11)
+  - ``bindings.cpp``:
+    - Validates NumPy dtype/contiguity/strides.
+    - Constructs zero-copy views when layouts match.
+    - Creates NumPy arrays that alias internal buffers (with a custom capsule deleter when owning).
+- **python/** (optional helpers)
+  - ``__init__.py``: import shims, convenience utilities (e.g., dtype mapping).
+- **cli/** (optional)
+  - Inspect/convert arrays (print shape/strides, verify aliasing).
+- **tests/**
+  - **C++** unit tests for index math, shape/stride invariants, AoS samples.
+  - **Python** tests with NumPy as golden (values, shapes, strides, buffer aliasing).
+- **docs/**
+  - Proposal, design notes, API examples.
+
+Zero-copy policy and safety
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- **Zero-copy eligibility** requires: compatible dtype, contiguous (or accepted stride pattern), and lifetime safety.
+- **Adopting external buffers** (from NumPy): library stores a *non-owning* pointer with a reference/capsule to keep the Python object alive while views exist.
+- **Exposing internal buffers** (to NumPy): NumPy receives a view that references the library-owned memory; a capsule deleter is attached to prevent premature free and ensure a single point of truth.
+- **Explicit copies** happen when: dtype/stride is incompatible, or the user sets ``copy=True``.
+
+Error handling and validation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Precondition checks:
+  - Shape non-empty, product fits in ``size_t`` and addressable memory.
+  - Dtype compatibility and stride sanity for zero-copy interop.
+- Error reporting:
+  - C++: exceptions with specific categories (invalid argument, allocation failure, interop mismatch).
+  - Python: mapped to ``ValueError``/``TypeError`` with precise diagnostics.
+- Debug builds:
+  - Optional bounds checks in ``operator()``.
+  - Assertions for invariant preservation (shape, strides, size).
+
+Performance considerations
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- **O(1)** offset arithmetic (no virtual calls, constexpr-friendly helpers where applicable).
+- Cache-aware contiguous layout; examples and micro-benchmarks included.
+- Avoid temporaries and needless copies in hot paths (move semantics where beneficial).
+
+Constraints and assumptions (v0.1)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Row-major only (column-major may be added later).
+- Single-threaded semantics; users may externally synchronize for multi-threading.
+- POD/standard-layout types for ``T``; non-POD support deferred.
+- No slicing/broadcasting in v0.1 (reserved for subsequent versions).
+- Platform: modern compilers supporting C++11; Python 3.9+.
+
+Extensibility roadmap (post v0.1)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Slicing/broadcasting views; subarray and reshaping utilities.
+- Columnar (SoA) adapter layer and traits.
+- Custom allocators (aligned, pinned) and small-vector optimization for shapes.
+- Multi-thread safety guards and shared-ownership views.
 
 API Description
 ---------------
