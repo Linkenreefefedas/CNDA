@@ -213,6 +213,21 @@ Automatic build
 ~~~~~~~~~~~~~~~
 Prereqs: CMake (>=3.18), C++11 compiler, Python 3.9+.
 
+**C++ core**
+::
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build -j
+  ctest --test-dir build --output-on-failure
+
+**Python binding (after pybind11 lands)**
+::
+  python -m venv .venv
+  # Windows: .\.venv\Scripts\activate
+  # Linux/macOS:
+  source .venv/bin/activate
+  pip install -U pip
+  pip install -e .
+
 Version control
 ~~~~~~~~~~~~~~~
 - GitHub public repo; default branch: ``main`` (protected).
