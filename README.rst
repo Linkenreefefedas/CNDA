@@ -38,15 +38,15 @@ System Architecture
 The system consists of two main layers:
 
 1. **Core (C++11)**
-  - `cnda::ContiguousND<T>` manages an owning, row-major contiguous buffer.
-  - Tracks `shape` and `strides` for O(1) offset computation.
-  - Clean element access via `operator()` instead of manual pointer math.
-  - Supports fundamental POD types (float, double, int32, int64) and a **POD AoS demo**.
+- `cnda::ContiguousND<T>` manages an owning, row-major contiguous buffer.
+- Tracks `shape` and `strides` for O(1) offset computation.
+- Clean element access via `operator()` instead of manual pointer math.
+- Supports fundamental POD types (float, double, int32, int64) and a **POD AoS demo**.
 
 2. **Interop (pybind11)**
-  - `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
-  - Prefers **zero-copy** when dtype/layout/lifetime are compatible.
-  - With `copy=True`, performs explicit copying; otherwise, raises a clear error.
+- `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
+- Prefers **zero-copy** when dtype/layout/lifetime are compatible.
+- With `copy=True`, performs explicit copying; otherwise, raises a clear error.
 
 **Inputs**
  - Python: an existing `numpy.ndarray` or a desired shape.
@@ -141,8 +141,8 @@ Python API (module ``cnda``)
 
 - Returns a **zero-copy view** if the dtype and layout are compatible.
 - If not compatible:
-  - With ``copy=True``: performs an explicit copy.
-  - With ``copy=False``: raises ``ValueError`` or ``TypeError`` on the Python side.
+   - With ``copy=True``: performs an explicit copy.
+   - With ``copy=False``: raises ``ValueError`` or ``TypeError`` on the Python side.
 - The dtype-specific suffix for ``ContiguousND_*`` is one of: ``f32``, ``f64``, ``i32``, ``i64``.
 
 ``ContiguousND_*.to_numpy(copy: bool = False) -> numpy.ndarray``
