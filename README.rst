@@ -36,10 +36,10 @@ The system consists of two main layers:
     - Clean element access via `operator()` instead of manual pointer math.
     - Supports fundamental POD types (float, double, int32, int64) and a **POD AoS demo**.
 
-2. **Interop (pybind11)** 
-   - `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
-   - Prefers **zero-copy** when dtype/layout/lifetime are compatible.
-   - With `copy=True`, performs explicit copying; otherwise, raises a clear error.
+**Interop (pybind11)** 
+  - `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
+  - Prefers **zero-copy** when dtype/layout/lifetime are compatible.
+  - With `copy=True`, performs explicit copying; otherwise, raises a clear error.
 
 **Inputs**
  - Python: an existing `numpy.ndarray` or a desired shape.
