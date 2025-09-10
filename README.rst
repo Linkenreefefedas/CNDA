@@ -53,15 +53,15 @@ The system consists of two main layers:
  1. **Python → C++**
      - A NumPy ``ndarray`` is passed into ``from_numpy(copy=...)``.
      - Interop validates dtype, alignment, and layout:
-       - If compatible → returns a zero-copy view in C++.
-       - If incompatible → raises an error or copies if ``copy=True``.
+        - If compatible → returns a zero-copy view in C++.
+        - If incompatible → raises an error or copies if ``copy=True``.
      - The array becomes available as a ``ContiguousND<T>`` for C++ computations.
 
  2. **C++ → Python**
      - A new ``ContiguousND<T>`` is allocated in C++ and filled with values.
      - Results are exported via ``to_numpy(copy=...)``:
-       - If ``copy=False`` and safe → Python receives a NumPy view of the same buffer.
-       - Otherwise → Python receives a copy, ensuring safety and compatibility.
+        - If ``copy=False`` and safe → Python receives a NumPy view of the same buffer.
+        - Otherwise → Python receives a copy, ensuring safety and compatibility.
 
 **Constraints (v0.1)**
  - Row-major contiguous layout only.
