@@ -34,11 +34,11 @@ The system consists of two main layers:
      - `cnda::ContiguousND<T>` manages an owning, row-major contiguous buffer.
      - Tracks `shape` and `strides` for O(1) offset computation.
      - Clean element access via `operator()` instead of manual pointer math.
-     - Supports fundamental POD types (float, double, int32, int64) and a **POD AoS demo**.
+     - Supports fundamental POD types (float, double, int32, int64) and a POD AoS demo.
 
 2. **Interop (pybind11)**
      - `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
-     - Prefers **zero-copy** when dtype/layout/lifetime are compatible.
+     - Prefers zero-copy when dtype/layout/lifetime are compatible.
      - With `copy=True`, performs explicit copying; otherwise, raises a clear error.
 
 **Inputs**
@@ -47,7 +47,7 @@ The system consists of two main layers:
 
 **Outputs**
  - C++: element references and raw pointers through the API.
- - Python: NumPy **views** of the same buffer (no copy if safe) or **copies** when requested.
+ - Python: NumPy views of the same buffer (no copy if safe) or copies when requested.
 
 **Workflow**
  1. Create a new array in C++ (owning) or pass an existing NumPy array (view).
@@ -60,7 +60,7 @@ The system consists of two main layers:
  - POD element types (`float`, `double`, `int32`, `int64`).
  - Single-threaded semantics.
  - No slicing/broadcasting (reserved for later versions).
- - **Structs**: trivial POD AoS demo only; SoA is future work.
+ - Structs: trivial POD AoS demo only; SoA is future work.
 
 API Description
 ---------------
@@ -132,7 +132,7 @@ Python API (module ``cnda``)
 
 ``from_numpy(arr: numpy.ndarray, copy: bool = False) -> ContiguousND_*``
 
-- Returns a **zero-copy view** if the dtype and layout are compatible.
+- Returns a zero-copy view if the dtype and layout are compatible.
 - If not compatible:
    - With ``copy=True``: performs an explicit copy.
    - With ``copy=False``: raises ``ValueError`` or ``TypeError`` on the Python side.
@@ -140,8 +140,8 @@ Python API (module ``cnda``)
 
 ``ContiguousND_*.to_numpy(copy: bool = False) -> numpy.ndarray``
 
-- By default (``copy=False``), returns a **NumPy view** (no copy).
-- With ``copy=True``, returns a **new array**, isolating lifetime/ownership from the C++ object.
+- By default (``copy=False``), returns a NumPy view (no copy).
+- With ``copy=True``, returns a new array, isolating lifetime/ownership from the C++ object.
 
 **Round-trip example (zero-copy)**
 
@@ -177,29 +177,29 @@ Python API (module ``cnda``)
 
 Zero-copy and error semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-``from_numpy(arr, copy=False)`` is **zero-copy** only if:
+``from_numpy(arr, copy=False)`` is zero-copy only if:
 
-1. dtype matches the bound container type
-2. array is **C-contiguous (row-major)**
-3. lifetime is safe (binding keeps the producer alive)
+1. Dtype matches the bound container type
+2. Array is C-contiguous (row-major)
+3. Lifetime is safe (binding keeps the producer alive)
 
 Otherwise:
 
-- if ``copy=True`` → make an explicit copy  
-- if ``copy=False`` → raise ``ValueError``/``TypeError`` (Python) or throw ``std::invalid_argument`` (C++)
+- If ``copy=True`` → make an explicit copy  
+- If ``copy=False`` → raise ``ValueError``/``TypeError`` (Python) or throw ``std::invalid_argument`` (C++)
 
-``to_numpy(copy=False)`` returns a **NumPy view** with a capsule deleter.  
+``to_numpy(copy=False)`` returns a NumPy view with a capsule deleter.  
 Use ``copy=True`` to force duplication and isolate the lifetime from the C++ owner.
 
 Bounds & Safety
 ~~~~~~~~~~~~~~~
-- `operator()` performs **no bounds checking** (performance-first).
-- Provide `at(...)` or a **Debug** flag (e.g., `-DCNDA_BOUNDS_CHECK=ON`) to enable bounds checks in development.
+- `operator()` performs no bounds checking (performance-first).
+- Provide `at(...)` or a Debug flag (e.g., `-DCNDA_BOUNDS_CHECK=ON`) to enable bounds checks in development.
 
 Threading Model
 ~~~~~~~~~~~~~~~
-- v0.1 semantics are **single-threaded**.
-- Concurrent **read-only** access may be safe if the producer lifetime is guaranteed; concurrent writes require external synchronization and are out of scope for v0.1.
+- v0.1 semantics are single-threaded.
+- Concurrent read-only access may be safe if the producer lifetime is guaranteed; concurrent writes require external synchronization and are out of scope for v0.1.
 
 Exceptions and Error Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -221,8 +221,8 @@ Version control
 
 Testing
 ~~~~~~~
-- **C++**: **Catch2** via CTest (shape/strides/index; negative cases).
-- **Python**: pytest with NumPy as oracle; zero-copy checks via ``ctypes.data``; dtype/contiguity validation.
+- C++: Catch2 via CTest (shape/strides/index; negative cases).
+- Python: pytest with NumPy as oracle; zero-copy checks via ``ctypes.data``; dtype/contiguity validation.
 
 Documentation
 ~~~~~~~~~~~~~
@@ -233,14 +233,14 @@ Schedule
 --------
 8-week plan; Weeks 1–6 focus on core; Weeks 7–8 on integration/delivery.
 
-- **Week 1**: Initialize repository and CMake; build minimal `ContiguousND<float>` with shape/strides and basic tests.  
-- **Week 2**: Extend to multiple scalar types; add clean indexing via `operator()` with error handling.  
-- **Week 3**: Implement pybind11 bindings; enable NumPy interop with zero-copy validation and pytest.  
-- **Week 4**: Strengthen zero-copy safety (ownership, capsule deleter); add explicit copy path and debug bounds checks.  
-- **Week 5**: Demonstrate POD AoS usage with examples; run micro-benchmarks and refine API.  
-- **Week 6**: Improve documentation and tutorials.  
-- **Week 7**: Freeze v0.1 API; finalize comprehensive tests and cross-platform validation.  
-- **Week 8**: Polish documentation; release v0.1.0 and deliver presentation/demo.
+- Week 1: Initialize repository and CMake; build minimal `ContiguousND<float>` with shape/strides and basic tests.  
+- Week 2: Extend to multiple scalar types; add clean indexing via `operator()` with error handling.  
+- Week 3: Implement pybind11 bindings; enable NumPy interop with zero-copy validation and pytest.  
+- Week 4: Strengthen zero-copy safety (ownership, capsule deleter); add explicit copy path and debug bounds checks.  
+- Week 5: Demonstrate POD AoS usage with examples; run micro-benchmarks and refine API.  
+- Week 6: Improve documentation and tutorials.  
+- Week 7: Freeze v0.1 API; finalize comprehensive tests and cross-platform validation.  
+- Week 8: Polish documentation; release v0.1.0 and deliver presentation/demo.
 
 References
 ----------
