@@ -191,17 +191,17 @@ Otherwise:
 ``to_numpy(copy=False)`` returns a NumPy view with a capsule deleter.  
 Use ``copy=True`` to force duplication and isolate the lifetime from the C++ owner.
 
-Bounds & Safety
+Bounds & safety
 ~~~~~~~~~~~~~~~
 - `operator()` performs no bounds checking (performance-first).
 - Provide `at(...)` or a Debug flag (e.g., `-DCNDA_BOUNDS_CHECK=ON`) to enable bounds checks in development.
 
-Threading Model
+Threading model
 ~~~~~~~~~~~~~~~
 - v0.1 semantics are single-threaded.
 - Concurrent read-only access may be safe if the producer lifetime is guaranteed; concurrent writes require external synchronization and are out of scope for v0.1.
 
-Exceptions and Error Types
+Exceptions and error types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 - Python layer: `TypeError` (dtype mismatch), `ValueError` (layout/size incompatibility), `RuntimeError` (lifetime/capsule issues).
 - C++ layer: throws `std::invalid_argument` or `std::runtime_error` with clear messages.
