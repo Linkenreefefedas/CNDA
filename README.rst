@@ -13,13 +13,13 @@ Problem to Solve
 In scientific and numerical software, multi-dimensional arrays are fundamental data structures. 
 However, existing approaches in C++ and Python interoperation expose several critical issues:
 
-1. **Complex indexing in C++** 
+ 1. **Complex indexing in C++** 
  Raw pointer arithmetic makes multi-dimensional access cryptic and error-prone.  
-2. **Performance and memory overhead** 
+ 2. **Performance and memory overhead** 
  Data exchange often requires redundant copies that waste memory and slow performance.  
-3. **Lack of composite type support** 
+ 3. **Lack of composite type support** 
  Storing multiple variables per grid point needs AoS/SoA layouts, which lightweight libraries rarely provide.  
-4. **Unclear API design** 
+ 4. **Unclear API design** 
  Users expect NumPy-like clean syntax, but C++ APIs often expose cumbersome low-level details.
 
 Prospective Users
