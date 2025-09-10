@@ -1,7 +1,7 @@
 Contiguous N-Dimensional Array
 ==============================
 
-A compact C++11/Python library for cache-friendly N-D arrays with struct support and **zero-copy** NumPy interoperability.
+A compact C++11/Python library for cache-friendly N-dimensional arrays with struct support and **zero-copy** NumPy interoperability.
 
 Basic Information
 -----------------
@@ -213,21 +213,6 @@ Automatic build
 ~~~~~~~~~~~~~~~
 Prereqs: CMake (>=3.18), C++11 compiler, Python 3.9+.
 
-**C++ core**
-::
-  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-  cmake --build build -j
-  ctest --test-dir build --output-on-failure
-
-**Python binding (after pybind11 lands)**
-::
-  python -m venv .venv
-  # Windows: .\.venv\Scripts\activate
-  # Linux/macOS:
-  source .venv/bin/activate
-  pip install -U pip
-  pip install -e .
-
 Version control
 ~~~~~~~~~~~~~~~
 - GitHub public repo; default branch: ``main`` (protected).
@@ -253,7 +238,7 @@ Schedule
 - **Week 3**: Implement pybind11 bindings; enable NumPy interop with zero-copy validation and pytest.  
 - **Week 4**: Strengthen zero-copy safety (ownership, capsule deleter); add explicit copy path and debug bounds checks.  
 - **Week 5**: Demonstrate POD AoS usage with examples; run micro-benchmarks and refine API.  
-- **Week 6**: Prototype optional SoA adapter; improve documentation and tutorials.  
+- **Week 6**: Improve documentation and tutorials.  
 - **Week 7**: Freeze v0.1 API; finalize comprehensive tests and cross-platform validation.  
 - **Week 8**: Polish documentation; release v0.1.0 and deliver presentation/demo.
 
