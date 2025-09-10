@@ -30,13 +30,13 @@ System Architecture
 -------------------
 The system consists of two main layers:
 
-1. **Core (C++11)**
+1. Core (C++11)
  - `cnda::ContiguousND<T>` manages an owning, row-major contiguous buffer.
  - Tracks `shape` and `strides` for O(1) offset computation.
  - Clean element access via `operator()` instead of manual pointer math.
  - Supports fundamental POD types (float, double, int32, int64) and a **POD AoS demo**.
 
-2. **Interop (pybind11)**
+2. Interop (pybind11)
  - `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
  - Prefers **zero-copy** when dtype/layout/lifetime are compatible.
  - With `copy=True`, performs explicit copying; otherwise, raises a clear error.
