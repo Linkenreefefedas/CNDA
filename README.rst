@@ -14,7 +14,7 @@ In scientific and numerical software, multi-dimensional arrays are fundamental d
 However, existing approaches in C++ and Python interoperation expose several critical issues:
 
 1. **Complex indexing in C++**  
-  Multi-dimensional arrays are often represented as raw pointers in contiguous memory. 
+  Multi-dimensional arrays are often represented as raw pointers in contiguous memory.
   Manual offset arithmetic makes the code cryptic, error-prone, and difficult to maintain.
 
 2. **Performance and memory overhead**  
@@ -38,44 +38,44 @@ System Architecture
 The system consists of two main layers:
 
 1. **Core (C++11)**
-   - `ContiguousND<T>` is a templated class that manages a contiguous memory buffer.
-   - Tracks `shape` and `strides` for constant-time index calculation.
-   - Provides clean element access via `operator()` instead of manual pointer arithmetic.
-   - Supports both fundamental types (float, int) and simple structs (AoS/SoA demos).
+  - `cnda::ContiguousND<T>` manages an owning, row-major contiguous buffer.
+  - Tracks `shape` and `strides` for O(1) offset computation.
+  - Clean element access via `operator()` instead of manual pointer math.
+  - Supports fundamental POD types (float, double, int32, int64) and a **POD AoS demo**.
 
 2. **Interop (pybind11)**
-   - Provides functions `from_numpy()` and `to_numpy()`.
-   - Enables zero-copy data sharing between NumPy arrays and `ContiguousND` when layout and type are compatible.
-   - Falls back to explicit copies only when required.
+  - `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
+  - Prefers **zero-copy** when dtype/layout/lifetime are compatible.
+  - With `copy=True`, performs explicit copying; otherwise, raises a clear error.
 
 **Inputs**
-- From Python: an existing `numpy.ndarray` or a requested shape.
-- From C++: a shape vector (e.g., `{nx, ny, nz}`).
+- Python: an existing `numpy.ndarray` or a desired shape.
+- C++: a shape vector (e.g., `{nx, ny, nz}`).
 
 **Outputs**
-- C++: element references or raw pointers through the API.
-- Python: NumPy views of the same buffer (no copy if safe).
+- C++: element references and raw pointers through the API.
+- Python: NumPy **views** of the same buffer (no copy if safe) or **copies** when requested.
 
 **Workflow**
-1. User creates a new array in C++ or passes an existing NumPy array.
-2. The core stores/aliases the buffer contiguously and exposes safe indexing.
-3. Operations are performed through C++ methods or Python wrappers.
-4. Results can be returned as C++ values or NumPy arrays.
+1. Create a new array in C++ (owning) or pass an existing NumPy array (view).
+2. The core stores/aliases the contiguous buffer and exposes safe indexing.
+3. Perform operations via C++ methods or Python wrappers.
+4. Return results as C++ values or NumPy arrays, with explicit copy control.
 
 **Constraints (v0.1)**
 - Row-major contiguous layout only.
-- POD element types (float, double, int32, int64).
-- Single-threaded semantics, with clear ownership rules for buffers.
-- No slicing/broadcasting in v0.1 (reserved for later versions).
+- POD element types (`float`, `double`, `int32`, `int64`).
+- Single-threaded semantics.
+- No slicing/broadcasting (reserved for later versions).
+- **Structs**: trivial POD AoS demo only; SoA is future work.
 
 API Description
 ---------------
 
-- **C++11 core**: a templated container ``cnda::ContiguousND<T>`` for contiguous N-D arrays
-  with explicit ``shape`` / ``strides`` and O(1) offset computation.
-- **Python binding (pybind11)**: a thin module ``cnda`` that provides
-  ``from_numpy()`` (NumPy → C++ view) and ``to_numpy()`` (C++ → NumPy view),
-  preferring **zero-copy** when dtype/layout are compatible.
+- **C++11 core**: templated container ``cnda::ContiguousND<T>`` for contiguous N-D arrays with explicit ``shape`` / ``strides`` and O(1) index computation.
+- **Python binding (pybind11)**: module ``cnda`` with
+  ``from_numpy(arr, copy: bool = False)`` (NumPy → C++ view/copy) and
+  ``to_numpy(copy: bool = False)`` (C++ → NumPy view/copy), both defaulting to zero-copy when safe.
 
 C++ API (namespace ``cnda``)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -87,6 +87,7 @@ C++ API (namespace ``cnda``)
   #pragma once
   #include <vector>
   #include <cstddef>
+  #include <initializer_list>
 
   namespace cnda {
 
@@ -116,7 +117,7 @@ C++ API (namespace ``cnda``)
 
   } // namespace cnda
 
-**Minimal usage (compiles as a prototype)**
+**Minimal usage (prototype)**
 
 .. code-block:: cpp
 
@@ -127,8 +128,8 @@ C++ API (namespace ``cnda``)
   int main() {
     ContiguousND<float> a({3, 4});   // 3x4 contiguous (row-major)
     a(1, 2) = 42.0f;
-    std::cout << "a(1,2) = " << a(1,2) << "\n";
-    std::cout << a.ndim() << "D, size=" << a.size() << "\n";
+    std::cout << "a(1,2) = " << a(1,2) << "\\n";
+    std::cout << a.ndim() << "D, size=" << a.size() << "\\n";
     return 0;
   }
 
@@ -136,14 +137,15 @@ Python API (module ``cnda``)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 **Top-level functions & types**
 
-- ``from_numpy(arr: numpy.ndarray) -> ContiguousND_f32/_f64/_i32/_i64``  
-  Creates a **zero-copy view** if dtype and layout are compatible; otherwise raises or,
-  in a future helper, allows an explicit copy.
+- ``from_numpy(arr: numpy.ndarray, copy: bool = False) -> ContiguousND_f32/_f64/_i32/_i64``  
+  Zero-copy view if dtype and layout are compatible; otherwise:
+  - if ``copy=True``: make an explicit copy;
+  - else: raise ``ValueError/TypeError`` (Python).
 
 - ``ContiguousND_*.to_numpy(copy: bool = False) -> numpy.ndarray``  
-  Returns a **NumPy view** (no copy) by default when safe; with ``copy=True`` returns a new array.
+  Returns a **NumPy view** (no copy) by default; with ``copy=True`` returns a new array, which also **isolates lifetime/ownership** from the C++ object.
 
-**Typical script (round-trip, zero-copy)**
+**Round-trip example (zero-copy)**
 
 .. code-block:: python
 
@@ -152,10 +154,10 @@ Python API (module ``cnda``)
 
   # NumPy → C++ view (no copy)
   x = np.arange(12, dtype=np.float32).reshape(3, 4)
-  a = cnda.from_numpy(x)             # view into x's buffer
+  a = cnda.from_numpy(x, copy=False)  # strict zero-copy
 
   # C++ → NumPy view (no copy)
-  y = a.to_numpy()                   # shares memory with x
+  y = a.to_numpy(copy=False)          # shares memory with x
   y[1, 2] = 42
   assert x[1, 2] == 42
   assert y.ctypes.data == x.ctypes.data  # same buffer
@@ -167,26 +169,39 @@ Python API (module ``cnda``)
   import numpy as np
   import cnda
 
-  b = cnda.ContiguousND_f32([2, 3])  # C++-owned contiguous buffer
-  B = b.to_numpy()                    # NumPy view (no copy)
+  b = cnda.ContiguousND_f32([2, 3])     # C++-owned contiguous buffer
+  B = b.to_numpy(copy=False)             # NumPy view (no copy)
   B.fill(7.0)
   assert (B == 7.0).all()
 
-Zero-copy and error semantics (concise)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- ``from_numpy`` is **zero-copy** only if:
-  (1) dtype matches the bound container type,
-  (2) array is C-contiguous (or an accepted stride pattern),
-  (3) lifetime is safe (binding keeps the producer alive).
-- ``to_numpy`` returns a **view** over the library-owned buffer with a capsule deleter.
-  Set ``copy=True`` to force duplication.
-- Incompatibilities raise ``ValueError``/``TypeError`` (Python) or throw
-  ``std::invalid_argument`` (C++) with clear diagnostics.
+  # If you need isolation from the C++ owner:
+  B_copy = b.to_numpy(copy=True)         # explicit copy with independent lifetime
 
-Notes
-~~~~~
-- v0.1 scopes: row-major layout, POD element types (``float``, ``double``, ``int32``, ``int64``), single-threaded semantics.
-- Future work: slicing/broadcasting, SoA (columnar) adapters, custom allocators, record-dtype/AoS helpers.
+Zero-copy and error semantics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- `from_numpy(arr, copy=False)` is **zero-copy** only if:
+  (1) dtype matches the bound container type,
+  (2) array is **C-contiguous (row-major)**,
+  (3) lifetime is safe (binding keeps the producer alive).
+  Otherwise:
+  - if `copy=True`, make an explicit copy;
+  - else raise `ValueError/TypeError` (Python) or throw `std::invalid_argument` (C++).
+- `to_numpy(copy=False)` returns a **view** with a capsule deleter; set `copy=True` to force duplication and lifetime isolation.
+
+Bounds & Safety
+~~~~~~~~~~~~~~~
+- `operator()` performs **no bounds checking** (performance-first).
+- Provide `at(...)` or a **Debug** flag (e.g., `-DCNDA_BOUNDS_CHECK=ON`) to enable bounds checks in development.
+
+Threading Model
+~~~~~~~~~~~~~~~
+- v0.1 semantics are **single-threaded**.
+- Concurrent **read-only** access may be safe if the producer lifetime is guaranteed; concurrent writes require external synchronization and are out of scope for v0.1.
+
+Exceptions and Error Types
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Python layer: `TypeError` (dtype mismatch), `ValueError` (layout/size incompatibility), `RuntimeError` (lifetime/capsule issues).
+- C++ layer: throws `std::invalid_argument` or `std::runtime_error` with clear messages.
 
 Engineering Infrastructure
 --------------------------
@@ -218,8 +233,8 @@ Version control
 
 Testing
 ~~~~~~~
-- **C++**: Catch2/GoogleTest via CTest (shape/strides/index; negative cases).
-- **Python**: pytest with NumPy as golden; zero-copy checks via ``ctypes.data``; dtype/contiguity validation.
+- **C++**: **Catch2** via CTest (shape/strides/index; negative cases).
+- **Python**: pytest with NumPy as oracle; zero-copy checks via ``ctypes.data``; dtype/contiguity validation.
 
 Documentation
 ~~~~~~~~~~~~~
@@ -230,14 +245,14 @@ Schedule
 --------
 8-week plan; Weeks 1–6 focus on core; Weeks 7–8 on integration/delivery. Dates are inclusive.
 
-- **Week 1**: Repo & CMake scaffold; minimal `ContiguousND<float>` (shape/strides/size/data); C++ tests; README/proposal.
-- **Week 2**: Multi-dtype (f32/f64/i32/i64); `operator()` for 1–3D; basic error handling.
-- **Week 3**: pybind11 `from_numpy`/`to_numpy`; pytest (NumPy as golden); CI on.
-- **Week 4**: Zero-copy safety (ownership/lifetime); `copy=True` path; debug bounds checks.
-- **Week 5**: AoS demo (structs); micro-benchmarks; API polish.
-- **Week 6**: (Optional) SoA adapter; CLI inspector; docs pass.
-- **Week 7**: Freeze v0.1; cross-OS validation; slide/demo draft.
-- **Week 8**: Final validation; tag **v0.1.0**; presentation & submission.
+- Week 1: Set up repository/CMake; implement minimal ``ContiguousND<float>`` (shape/strides/size/data); initial C++ tests; draft README/proposal.
+- Week 2: Add scalar types (f32/f64/i32/i64); implement ``operator()`` for 1–3D; basic error handling; extend C++ tests.
+- Week 3: Add pybind11 bindings for ``from_numpy(copy=...)`` / ``to_numpy(copy=...)``; validate zero-copy interop; add pytest; configure CI.
+- Week 4: Harden zero-copy safety (ownership/lifetime; capsule deleter); implement explicit copy path; debug-only bounds checks; failure-path tests.
+- Week 5: Demonstrate **POD AoS** usage; structured-grid examples; micro-benchmarks; refine public API.
+- Week 6: Prototype **SoA adapter (optional)**; improve docs and examples.
+- Week 7: Freeze v0.1 API; finalize edge/property-based tests; validate on Linux/Windows; prepare slides and demos.
+- Week 8: Final validation and docs polish; tag/release v0.1.0; presentation and repository submission.
 
 References
 ----------
