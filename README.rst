@@ -13,21 +13,14 @@ Problem to Solve
 In scientific and numerical software, multi-dimensional arrays are fundamental data structures. 
 However, existing approaches in C++ and Python interoperation expose several critical issues:
 
-1. **Complex indexing in C++**  
-  Multi-dimensional arrays are often represented as raw pointers in contiguous memory.
-  Manual offset arithmetic makes the code cryptic, error-prone, and difficult to maintain.
-
-2. **Performance and memory overhead**  
-  Sharing data between C++ and Python usually requires copying buffers. 
-  For large-scale simulations, redundant copies result in wasted memory and significant performance degradation.
-
-3. **Lack of composite type support**  
-  Many numerical problems store multiple physical variables per grid point (e.g., density, velocity, pressure). 
-  Supporting both Array of Structs (AoS) and Struct of Arrays (SoA, columnar) layouts is essential but rarely addressed in a lightweight library.
-
-4. **Unclear API design**  
-  Users expect clean and intuitive APIs similar to NumPy’s syntax (e.g., `x[2,3,4]` in Python), 
-  but C++ implementations often expose cumbersome pointer arithmetic instead of high-level abstractions.
+1. **Complex indexing in C++** 
+ Raw pointer arithmetic makes multi-dimensional access cryptic and error-prone.  
+2. **Performance and memory overhead** 
+ Data exchange often requires redundant copies that waste memory and slow performance.  
+3. **Lack of composite type support** 
+ Storing multiple variables per grid point needs AoS/SoA layouts, which lightweight libraries rarely provide.  
+4. **Unclear API design** 
+ Users expect NumPy-like clean syntax, but C++ APIs often expose cumbersome low-level details.
 
 Prospective Users
 -----------------
@@ -38,15 +31,15 @@ System Architecture
 The system consists of two main layers:
 
 1. **Core (C++11)**
-- `cnda::ContiguousND<T>` manages an owning, row-major contiguous buffer.
-- Tracks `shape` and `strides` for O(1) offset computation.
-- Clean element access via `operator()` instead of manual pointer math.
-- Supports fundamental POD types (float, double, int32, int64) and a **POD AoS demo**.
+ - `cnda::ContiguousND<T>` manages an owning, row-major contiguous buffer.
+ - Tracks `shape` and `strides` for O(1) offset computation.
+ - Clean element access via `operator()` instead of manual pointer math.
+ - Supports fundamental POD types (float, double, int32, int64) and a **POD AoS demo**.
 
 2. **Interop (pybind11)**
-- `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
-- Prefers **zero-copy** when dtype/layout/lifetime are compatible.
-- With `copy=True`, performs explicit copying; otherwise, raises a clear error.
+ - `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
+ - Prefers **zero-copy** when dtype/layout/lifetime are compatible.
+ - With `copy=True`, performs explicit copying; otherwise, raises a clear error.
 
 **Inputs**
  - Python: an existing `numpy.ndarray` or a desired shape.
