@@ -1,7 +1,7 @@
 Contiguous N-Dimensional Array
 ==============================
 
-A compact C++11/Python library for cache-friendly N-dimensional arrays with struct support and **zero-copy** NumPy interoperability.
+A compact C++11/Python library for cache-friendly N-dimensional arrays with struct support and zero-copy NumPy interoperability.
 
 Basic Information
 -----------------
@@ -66,9 +66,9 @@ API Description
 ---------------
 
 - **C++11 core**: templated container ``cnda::ContiguousND<T>`` for contiguous N-D arrays with explicit ``shape`` / ``strides`` and O(1) index computation.
+
 - **Python binding (pybind11)**: module ``cnda`` with
-  ``from_numpy(arr, copy: bool = False)`` (NumPy → C++ view/copy) and
-  ``to_numpy(copy: bool = False)`` (C++ → NumPy view/copy), both defaulting to zero-copy when safe.
+  ``from_numpy(arr, copy: bool = False)`` (NumPy → C++ view/copy) and ``to_numpy(copy: bool = False)`` (C++ → NumPy view/copy), both defaulting to zero-copy when safe.
 
 C++ API (namespace ``cnda``)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
