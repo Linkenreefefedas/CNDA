@@ -13,13 +13,13 @@ Problem to Solve
 In scientific and numerical software, multi-dimensional arrays are fundamental data structures. 
 However, existing approaches in C++ and Python interoperation expose several critical issues:
 
- 1. **Complex indexing in C++** 
+1. **Complex indexing in C++** 
  Raw pointer arithmetic makes multi-dimensional access cryptic and error-prone.  
- 2. **Performance and memory overhead** 
+2. **Performance and memory overhead** 
  Data exchange often requires redundant copies that waste memory and slow performance.  
- 3. **Lack of composite type support** 
+3. **Lack of composite type support** 
  Storing multiple variables per grid point needs AoS/SoA layouts, which lightweight libraries rarely provide.  
- 4. **Unclear API design** 
+4. **Unclear API design** 
  Users expect NumPy-like clean syntax, but C++ APIs often expose cumbersome low-level details.
 
 Prospective Users
@@ -31,15 +31,15 @@ System Architecture
 The system consists of two main layers:
 
 1. **Core (C++11)**
- - `cnda::ContiguousND<T>` manages an owning, row-major contiguous buffer.
- - Tracks `shape` and `strides` for O(1) offset computation.
- - Clean element access via `operator()` instead of manual pointer math.
- - Supports fundamental POD types (float, double, int32, int64) and a **POD AoS demo**.
+- `cnda::ContiguousND<T>` manages an owning, row-major contiguous buffer.
+- Tracks `shape` and `strides` for O(1) offset computation.
+- Clean element access via `operator()` instead of manual pointer math.
+- Supports fundamental POD types (float, double, int32, int64) and a **POD AoS demo**.
 
 2. **Interop (pybind11)**
- - `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
- - Prefers **zero-copy** when dtype/layout/lifetime are compatible.
- - With `copy=True`, performs explicit copying; otherwise, raises a clear error.
+- `from_numpy(arr, copy: bool = False)` and `to_numpy(copy: bool = False)`.
+- Prefers **zero-copy** when dtype/layout/lifetime are compatible.
+- With `copy=True`, performs explicit copying; otherwise, raises a clear error.
 
 **Inputs**
  - Python: an existing `numpy.ndarray` or a desired shape.
