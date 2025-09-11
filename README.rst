@@ -7,7 +7,7 @@ Basic Information
 -----------------
 - GitHub Repository: https://github.com/Linkenreefefedas/CNDA.git
 - About: A lightweight C++11/Python library that provides contiguous multi-dimensional arrays with clean indexing, zero-copy NumPy interoperability, and support for both fundamental and composite (struct) types.
-- Footprint
+- Footprint:
    - Core (C++11): header-only, no external dependencies beyond the standard library.
    - Interop (pybind11): compiled Python extension built against pybind11 and NumPy headers.
 
