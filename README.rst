@@ -29,22 +29,22 @@ Comparison: SimpleArray vs CNDA
    * - C++↔NumPy interop
      - Zero-copy from ndarray and view back. Dtype mismatch raises error
      - Explicit interop policy. Zero-copy only when safe. Clear copy path with \
-     `from_numpy(copy=...)` and `to_numpy(copy=...)`
+       `from_numpy(copy=...)` and `to_numpy(copy=...)`
    * - Transpose and strides
      - Supports transpose. Some axis orders share memory and others do not
      - Documents which axis orders share memory. Zero-copy when stride \
-     reinterpretation is valid. Otherwise copy
+       reinterpretation is valid. Otherwise copy
    * - AoS bridge
      - Numeric tensors only
      - Minimal AoS bridge. NumPy structured dtypes map to C++ structs with \
-     guaranteed field order and alignment
+       guaranteed field order and alignment
    * - Core scope
      - Container plus numeric utilities and ghost cell concept
      - Minimal core with container, interop, and layout
    * - Types and compute
      - Multiple types with built-in stats and checks
      - POD types float32, float64, int32, int64. Heavy computations stay in \
-     NumPy or higher layers
+       NumPy or higher layers
 
 Problem to Solve
 ----------------
