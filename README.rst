@@ -23,8 +23,7 @@ Comparison: SimpleArray vs CNDA
    :widths: 20 40 40
 
    * - Aspect
-     - `SimpleArray <https://github.com/solvcon/modmesh/blob/master/tests/test_
-     buffer.py>`_
+     - `SimpleArray <https://github.com/solvcon/modmesh/blob/master/tests/test_buffer.py>`_
      - CNDA (proposal)
    * - C++↔NumPy interop
      - Zero-copy from ndarray and view back. Dtype mismatch raises error
