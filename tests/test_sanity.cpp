@@ -38,5 +38,6 @@ TEST_CASE("zero-sized dimension yields size=0 but valid metadata", "[edge]") {
     REQUIRE(a.ndim() == 2);
     REQUIRE(a.strides()[0] == 7);
     REQUIRE(a.strides()[1] == 1);
-    REQUIRE(a.data() == nullptr || a.data() != nullptr); // just ensure callable
+    (void)a.data();
+    SUCCEED("data() is callable on zero-sized array");
 }
