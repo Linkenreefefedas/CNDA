@@ -41,3 +41,51 @@ TEST_CASE("zero-sized dimension yields size=0 but valid metadata", "[edge]") {
     (void)a.data();
     SUCCEED("data() is callable on zero-sized array");
 }
+
+TEST_CASE("index() computes expected row-major offset (2D)", "[index]") {
+    cnda::ContiguousND<int> a({3, 4});
+    // For shape [3,4], strides = [4,1], so (1,2) => 1*4 + 2*1 = 6
+    REQUIRE(a.index({1, 2}) == 6);
+    REQUIRE(a.index({2, 3}) == 11);
+}
+
+TEST_CASE("operator() reads/writes 1D/2D/3D", "[op]") {
+    SECTION("1D") {
+        cnda::ContiguousND<int> a({5});
+        for (std::size_t i = 0; i < 5; ++i) a(i) = static_cast<int>(i * 10);
+        REQUIRE(a(0) == 0);
+        REQUIRE(a(4) == 40);
+    }
+    SECTION("2D") {
+        cnda::ContiguousND<int> a({3, 4});
+        int v = 0;
+        for (std::size_t i = 0; i < 3; ++i)
+          for (std::size_t j = 0; j < 4; ++j)
+            a(i, j) = v++;
+        REQUIRE(a(1, 2) == 6);  // acceptance: a(1,2) retrieves expected element
+        REQUIRE(a(2, 3) == 11);
+    }
+    SECTION("3D") {
+        cnda::ContiguousND<int> a({2, 3, 4});
+        int v = 0;
+        for (std::size_t i = 0; i < 2; ++i)
+          for (std::size_t j = 0; j < 3; ++j)
+            for (std::size_t k = 0; k < 4; ++k)
+              a(i, j, k) = v++;
+        // With strides [12,4,1], (1,1,2) => 1*12 + 1*4 + 2 = 18
+        REQUIRE(a(1, 1, 2) == 18);
+    }
+}
+
+#ifdef CNDA_BOUNDS_CHECK
+TEST_CASE("bounds checks throw on invalid indices", "[bounds]") {
+    cnda::ContiguousND<int> a2({3, 4});
+    REQUIRE_THROWS_AS(a2(3, 0), std::out_of_range); // i out of range
+    REQUIRE_THROWS_AS(a2(0, 4), std::out_of_range); // j out of range
+    REQUIRE_THROWS_AS(a2.index({3, 0}), std::out_of_range);
+    REQUIRE_THROWS_AS(a2.index({0, 0, 0}), std::out_of_range); // rank mismatch
+
+    cnda::ContiguousND<int> a1({0});
+    REQUIRE_THROWS_AS(a1(0), std::out_of_range); // zero-sized dimension
+}
+#endif
