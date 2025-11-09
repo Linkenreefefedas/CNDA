@@ -77,6 +77,75 @@ TEST_CASE("operator() reads/writes 1D/2D/3D", "[op]") {
     }
 }
 
+TEST_CASE("operator() N-dimensional variadic access", "[op][ndim]") {
+    SECTION("4D variadic") {
+        cnda::ContiguousND<int> a({2, 3, 4, 5});
+        // strides: [60, 20, 5, 1], total size: 2*3*4*5 = 120
+        REQUIRE(a.size() == 120);
+        REQUIRE(a.strides()[0] == 60);
+        REQUIRE(a.strides()[1] == 20);
+        REQUIRE(a.strides()[2] == 5);
+        REQUIRE(a.strides()[3] == 1);
+        
+        // Test read/write access
+        a(0, 0, 0, 0) = 1000;
+        a(1, 2, 3, 4) = 9999;
+        a(0, 1, 2, 3) = 5555;
+        
+        REQUIRE(a(0, 0, 0, 0) == 1000);
+        REQUIRE(a(1, 2, 3, 4) == 9999);
+        REQUIRE(a(0, 1, 2, 3) == 5555);
+        
+        // Verify index calculation: (1,2,3,4) = 1*60 + 2*20 + 3*5 + 4*1 = 119
+        std::size_t expected_idx = 1 * 60 + 2 * 20 + 3 * 5 + 4 * 1;
+        REQUIRE(expected_idx == 119);
+    }
+    
+    SECTION("5D variadic") {
+        cnda::ContiguousND<double> a({2, 2, 2, 2, 2});
+        // strides: [16, 8, 4, 2, 1], total size: 32
+        REQUIRE(a.size() == 32);
+        
+        // Test read/write with floating point values
+        a(0, 0, 0, 0, 0) = 1.5;
+        a(1, 1, 1, 1, 1) = 2.5;
+        
+        REQUIRE(a(0, 0, 0, 0, 0) == 1.5);
+        REQUIRE(a(1, 1, 1, 1, 1) == 2.5);
+        
+        // Verify: (1,1,1,1,1) = 16+8+4+2+1 = 31
+        std::size_t idx = 1*16 + 1*8 + 1*4 + 1*2 + 1*1;
+        REQUIRE(idx == 31);
+    }
+}
+
+TEST_CASE("operator() const correctness", "[op][const]") {
+    // Test const access for multi-dimensional arrays
+    SECTION("4D const access") {
+        cnda::ContiguousND<int> a({2, 3, 4, 5});
+        a(1, 2, 3, 4) = 777;
+        
+        const auto& ca = a;
+        REQUIRE(ca(1, 2, 3, 4) == 777);
+    }
+}
+
+TEST_CASE("operator() edge cases", "[op][edge]") {
+    SECTION("Single element array") {
+        cnda::ContiguousND<int> a({1});
+        a(0) = 55;
+        REQUIRE(a(0) == 55);
+    }
+    
+    SECTION("All dimensions are 1") {
+        // 4D array where each dimension is 1
+        cnda::ContiguousND<int> a({1, 1, 1, 1});
+        a(0, 0, 0, 0) = 88;
+        REQUIRE(a(0, 0, 0, 0) == 88);
+        REQUIRE(a.size() == 1);
+    }
+}
+
 #ifdef CNDA_BOUNDS_CHECK
 TEST_CASE("bounds checks throw on invalid indices", "[bounds]") {
     cnda::ContiguousND<int> a2({3, 4});
@@ -87,5 +156,30 @@ TEST_CASE("bounds checks throw on invalid indices", "[bounds]") {
 
     cnda::ContiguousND<int> a1({0});
     REQUIRE_THROWS_AS(a1(0), std::out_of_range); // zero-sized dimension
+}
+
+TEST_CASE("bounds checks for N-dimensional operator()", "[bounds][ndim]") {
+    SECTION("Out of bounds") {
+        // Test various dimensional out of bounds access
+        cnda::ContiguousND<int> a1({5});
+        REQUIRE_THROWS_AS(a1(5), std::out_of_range);
+        
+        cnda::ContiguousND<int> a4({2, 3, 4, 5});
+        REQUIRE_THROWS_AS(a4(2, 0, 0, 0), std::out_of_range);
+        REQUIRE_THROWS_AS(a4(0, 3, 0, 0), std::out_of_range);
+        REQUIRE_THROWS_AS(a4(0, 0, 4, 0), std::out_of_range);
+        REQUIRE_THROWS_AS(a4(0, 0, 0, 5), std::out_of_range);
+    }
+    
+    SECTION("Rank mismatch") {
+        // Test calling with wrong number of indices
+        cnda::ContiguousND<int> a2({3, 4});
+        REQUIRE_THROWS_AS(a2(0), std::out_of_range);       // 1D call on 2D array
+        REQUIRE_THROWS_AS(a2(0, 0, 0), std::out_of_range); // 3D call on 2D array
+        
+        cnda::ContiguousND<int> a3({2, 3, 4});
+        REQUIRE_THROWS_AS(a3(0, 0), std::out_of_range);    // 2D call on 3D array
+        REQUIRE_THROWS_AS(a3(0, 0, 0, 0), std::out_of_range); // 4D call on 3D array
+    }
 }
 #endif
