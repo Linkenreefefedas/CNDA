@@ -242,6 +242,8 @@ Python API (module ``cnda``)
   # If you need isolation from the C++ owner:
   B_copy = b.to_numpy(copy=True)       # explicit copy with independent lifetime
 
+**For more details, see:** `docs/PYTHON_BINDINGS.md <docs/PYTHON_BINDINGS.md>`_
+
 Zero-copy and error semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``from_numpy(arr, copy=False)`` is zero-copy only if:
