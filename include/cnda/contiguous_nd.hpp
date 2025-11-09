@@ -74,57 +74,52 @@ public:
     }
     return off;
   }
-  // -------- operator() overloads (1D/2D/3D) --------
-  // 1D
-  T& operator()(std::size_t i) {
+  // -------- operator() overload (N-dimensional) --------
+  // Variadic template for N-dimensional access
+  template<typename... Indices>
+  T& operator()(Indices... indices) {
+    constexpr std::size_t n = sizeof...(Indices);
+    std::size_t idx_array[n] = {static_cast<std::size_t>(indices)...};
+    
 #ifdef CNDA_BOUNDS_CHECK
-    if (m_ndim != 1 || i >= m_shape[0]) {
-      throw std::out_of_range("operator(): out of bounds (1D)");
+    if (n != m_ndim) {
+      throw std::out_of_range("operator(): rank mismatch");
     }
 #endif
-    return m_buffer[i];
+    
+    std::size_t offset = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+#ifdef CNDA_BOUNDS_CHECK
+      if (idx_array[i] >= m_shape[i]) {
+        throw std::out_of_range("operator(): index out of bounds");
+      }
+#endif
+      offset += idx_array[i] * m_strides[i];
+    }
+    return m_buffer[offset];
   }
-  const T& operator()(std::size_t i) const {
+  
+  template<typename... Indices>
+  const T& operator()(Indices... indices) const {
+    constexpr std::size_t n = sizeof...(Indices);
+    std::size_t idx_array[n] = {static_cast<std::size_t>(indices)...};
+    
 #ifdef CNDA_BOUNDS_CHECK
-    if (m_ndim != 1 || i >= m_shape[0]) {
-      throw std::out_of_range("operator() const: out of bounds (1D)");
+    if (n != m_ndim) {
+      throw std::out_of_range("operator() const: rank mismatch");
     }
 #endif
-    return m_buffer[i];
-  }
-  // 2D
-  T& operator()(std::size_t i, std::size_t j) {
+    
+    std::size_t offset = 0;
+    for (std::size_t i = 0; i < n; ++i) {
 #ifdef CNDA_BOUNDS_CHECK
-    if (m_ndim != 2 || i >= m_shape[0] || j >= m_shape[1]) {
-      throw std::out_of_range("operator(): out of bounds (2D)");
-    }
+      if (idx_array[i] >= m_shape[i]) {
+        throw std::out_of_range("operator() const: index out of bounds");
+      }
 #endif
-    return m_buffer[i * m_strides[0] + j * m_strides[1]];
-  }
-  const T& operator()(std::size_t i, std::size_t j) const {
-#ifdef CNDA_BOUNDS_CHECK
-    if (m_ndim != 2 || i >= m_shape[0] || j >= m_shape[1]) {
-      throw std::out_of_range("operator() const: out of bounds (2D)");
+      offset += idx_array[i] * m_strides[i];
     }
-#endif
-    return m_buffer[i * m_strides[0] + j * m_strides[1]];
-  }
-  // 3D
-  T& operator()(std::size_t i, std::size_t j, std::size_t k) {
-#ifdef CNDA_BOUNDS_CHECK
-    if (m_ndim != 3 || i >= m_shape[0] || j >= m_shape[1] || k >= m_shape[2]) {
-      throw std::out_of_range("operator(): out of bounds (3D)");
-    }
-#endif
-    return m_buffer[i * m_strides[0] + j * m_strides[1] + k * m_strides[2]];
-  }
-  const T& operator()(std::size_t i, std::size_t j, std::size_t k) const {
-#ifdef CNDA_BOUNDS_CHECK
-    if (m_ndim != 3 || i >= m_shape[0] || j >= m_shape[1] || k >= m_shape[2]) {
-      throw std::out_of_range("operator() const: out of bounds (3D)");
-    }
-#endif
-    return m_buffer[i * m_strides[0] + j * m_strides[1] + k * m_strides[2]];
+    return m_buffer[offset];
   }
   
 private:
