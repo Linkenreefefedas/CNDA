@@ -7,11 +7,6 @@
 
 namespace cnda {
 
-/**
- * Row-major contiguous N-D container (header-only, minimal v0.2).
- * - Strides are measured in ELEMENTS (not bytes).
- * - O(1) accessors: shape(), strides(), ndim(), size(), data().
- */
 template <class T>
 class ContiguousND {
 public:
