@@ -43,11 +43,11 @@ def test_from_numpy_zero_copy_f32():
     assert arr[0, 1] == 2.0
     assert arr[1, 0] == 3.0
     assert arr[1, 1] == 4.0
-    print("✓ Values match")
+    print("v Values match")
     
     # NOTE: Since we're copying data even in "zero-copy" mode for safety,
     # pointers won't match. True zero-copy requires buffer protocol support.
-    print("\n✓ AC1: from_numpy works for C-contiguous float32")
+    print("\nv AC1: from_numpy works for C-contiguous float32")
     return True
 
 
@@ -65,25 +65,25 @@ def test_from_numpy_dtype_mismatch():
     try:
         # This will work because we copy data
         arr = cnda.from_numpy_f32(x.astype(np.float32), copy=False)
-        print("✓ Correct dtype accepted")
+        print("v Correct dtype accepted")
     except TypeError as e:
-        print(f"✗ Unexpected error: {e}")
+        print(f"x Unexpected error: {e}")
         return False
     
     # Test with generic from_numpy
     arr_f64 = cnda.from_numpy(x, copy=False)
-    print(f"✓ Generic from_numpy auto-detected float64")
+    print(f"v Generic from_numpy auto-detected float64")
     
     # Test unsupported dtype
     x_bad = np.array([[1, 2], [3, 4]], dtype=np.int16)
     try:
         arr = cnda.from_numpy(x_bad, copy=False)
-        print("✗ Should have raised TypeError for unsupported dtype")
+        print("x Should have raised TypeError for unsupported dtype")
         return False
     except TypeError as e:
-        print(f"✓ TypeError raised for unsupported dtype: {e}")
+        print(f"v TypeError raised for unsupported dtype: {e}")
     
-    print("\n✓ AC2: Dtype checking works correctly")
+    print("\nv AC2: Dtype checking works correctly")
     return True
 
 
@@ -101,21 +101,21 @@ def test_from_numpy_layout_mismatch():
     # Try with copy=False - should raise error
     try:
         arr = cnda.from_numpy_f32(x, copy=False)
-        print("✗ Should have raised error for non-C-contiguous array")
+        print("x Should have raised error for non-C-contiguous array")
         return False
     except (ValueError, RuntimeError) as e:
-        print(f"✓ Error raised for non-C-contiguous: {type(e).__name__}")
+        print(f"v Error raised for non-C-contiguous: {type(e).__name__}")
     
     # With copy=True should work
     try:
         arr = cnda.from_numpy_f32(x, copy=True)
-        print("✓ copy=True works with non-C-contiguous array")
+        print("v copy=True works with non-C-contiguous array")
         assert arr[0, 0] == 1.0
     except Exception as e:
-        print(f"✗ copy=True failed: {e}")
+        print(f"x copy=True failed: {e}")
         return False
     
-    print("\n✓ AC2: Layout checking works correctly")
+    print("\nv AC2: Layout checking works correctly")
     return True
 
 
@@ -140,9 +140,9 @@ def test_from_numpy_with_copy():
     
     # ContiguousND should retain original value (deep copy)
     assert arr[0, 0] == original_value
-    print(f"✓ ContiguousND value unchanged: {arr[0, 0]} (deep copy confirmed)")
+    print(f"v ContiguousND value unchanged: {arr[0, 0]} (deep copy confirmed)")
     
-    print("\n✓ AC3: copy=True creates deep copy")
+    print("\nv AC3: copy=True creates deep copy")
     return True
 
 
@@ -170,17 +170,17 @@ def test_to_numpy_zero_copy():
     assert np.isclose(np_arr[0, 0], 1.0)
     assert np.isclose(np_arr[1, 2], 42.5)
     assert np.isclose(np_arr[2, 3], 99.9)
-    print("✓ Values match")
+    print("v Values match")
     
     # Verify it's a view (modification should be reflected)
     # Note: This may not work if copy was forced for safety
     np_arr[0, 1] = 123.0
-    print(f"✓ Can modify NumPy array")
+    print(f"v Can modify NumPy array")
     
     # Test that capsule keeps data alive
-    print("✓ Capsule deleter manages lifetime")
+    print("v Capsule deleter manages lifetime")
     
-    print("\n✓ AC4: to_numpy(copy=False) works with capsule deleter")
+    print("\nv AC4: to_numpy(copy=False) works with capsule deleter")
     return True
 
 
@@ -206,9 +206,9 @@ def test_to_numpy_with_copy():
     
     # ContiguousND should be unchanged
     assert arr[0, 0] == 1.0
-    print(f"✓ ContiguousND unchanged: arr[0,0]={arr[0, 0]} (independent copy)")
+    print(f"v ContiguousND unchanged: arr[0,0]={arr[0, 0]} (independent copy)")
     
-    print("\n✓ AC3: to_numpy(copy=True) creates independent copy")
+    print("\nv AC3: to_numpy(copy=True) creates independent copy")
     return True
 
 
@@ -232,9 +232,9 @@ def test_round_trip():
     
     # Verify values match
     assert np.allclose(x_orig, x_back)
-    print("✓ Round-trip preserves values")
+    print("v Round-trip preserves values")
     
-    print("\n✓ Round-trip conversion works correctly")
+    print("\nv Round-trip conversion works correctly")
     return True
 
 
@@ -259,18 +259,18 @@ def test_multiple_dtypes():
         
         # Convert to ContiguousND
         arr = cnda.from_numpy(x, copy=True)
-        print(f"  ✓ from_numpy works for {name}")
+        print(f"  v from_numpy works for {name}")
         
         # Verify type
         assert isinstance(arr, cnda_class)
-        print(f"  ✓ Correct type: {type(arr).__name__}")
+        print(f"  v Correct type: {type(arr).__name__}")
         
         # Convert back to NumPy
         y = arr.to_numpy(copy=False)
         assert y.dtype == np_dtype
-        print(f"  ✓ to_numpy preserves dtype")
+        print(f"  v to_numpy preserves dtype")
     
-    print("\n✓ All dtypes supported correctly")
+    print("\nv All dtypes supported correctly")
     return True
 
 
@@ -284,7 +284,7 @@ def test_docstrings():
     from_numpy_doc = cnda.from_numpy.__doc__
     assert from_numpy_doc is not None
     assert "zero-copy" in from_numpy_doc.lower() or "C-contiguous" in from_numpy_doc
-    print("✓ from_numpy has docstring describing requirements")
+    print("v from_numpy has docstring describing requirements")
     
     # Check to_numpy docstring
     arr = cnda.ContiguousND_f32([2, 2])
@@ -292,13 +292,13 @@ def test_docstrings():
     assert to_numpy_doc is not None
     assert "copy" in to_numpy_doc.lower()
     assert "lifetime" in to_numpy_doc.lower() or "capsule" in to_numpy_doc.lower()
-    print("✓ to_numpy has docstring describing ownership semantics")
+    print("v to_numpy has docstring describing ownership semantics")
     
     # Print sample docstrings
     print("\nSample from_numpy docstring (first 200 chars):")
     print(from_numpy_doc[:200] + "...")
     
-    print("\n✓ AC5: Docstrings clearly describe requirements")
+    print("\nv AC5: Docstrings clearly describe requirements")
     return True
 
 
@@ -326,7 +326,7 @@ def main():
             passed = test_func()
             results.append((name, passed))
         except Exception as e:
-            print(f"\n✗ Test '{name}' failed with exception: {e}")
+            print(f"\nx Test '{name}' failed with exception: {e}")
             import traceback
             traceback.print_exc()
             results.append((name, False))
@@ -337,7 +337,7 @@ def main():
     print("=" * 70)
     
     for name, passed in results:
-        status = "✓ PASS" if passed else "✗ FAIL"
+        status = "v PASS" if passed else "x FAIL"
         print(f"{status}: {name}")
     
     passed_count = sum(1 for _, p in results if p)
@@ -349,15 +349,15 @@ def main():
         print("\n" + "=" * 70)
         print("ALL ACCEPTANCE CRITERIA MET!")
         print("=" * 70)
-        print("✓ AC1: from_numpy(copy=False) works for C-contiguous arrays")
-        print("✓ AC2: copy=False validates dtype/layout and raises errors")
-        print("✓ AC3: copy=True always creates deep copies")
-        print("✓ AC4: to_numpy(copy=False) provides zero-copy view with capsule")
-        print("✓ AC5: Docstrings describe requirements clearly")
+        print("v AC1: from_numpy(copy=False) works for C-contiguous arrays")
+        print("v AC2: copy=False validates dtype/layout and raises errors")
+        print("v AC3: copy=True always creates deep copies")
+        print("v AC4: to_numpy(copy=False) provides zero-copy view with capsule")
+        print("v AC5: Docstrings describe requirements clearly")
         print("=" * 70)
         return 0
     else:
-        print("\n✗ Some tests failed")
+        print("\nx Some tests failed")
         return 1
 
 
