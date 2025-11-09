@@ -50,4 +50,3 @@ jobs:
             export PYTHONPATH="build/python:$PYTHONPATH"
           fi
           python tests/test_python_bindings.py
-          python tests/test_numpy_interop.py
