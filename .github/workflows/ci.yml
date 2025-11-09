@@ -30,7 +30,10 @@ jobs:
           pip install numpy pybind11 pytest
 
       - name: Configure (CMake)
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+        run: |
+          PYBIND11_DIR=$(python -c "import pybind11; print(pybind11.get_cmake_dir())")
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -Dpybind11_DIR="$PYBIND11_DIR"
+        shell: bash
 
       - name: Build
         run: cmake --build build --config ${{ matrix.build_type }} -j
