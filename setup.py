@@ -19,8 +19,6 @@ from pathlib import Path
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
-import pybind11
-
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
@@ -30,6 +28,8 @@ class CMakeExtension(Extension):
 
 class CMakeBuild(build_ext):
     def build_extension(self, ext):
+        import pybind11
+        
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         
         # required for auto-detection of auxiliary "native" libs
