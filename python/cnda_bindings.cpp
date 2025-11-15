@@ -21,9 +21,12 @@ cnda::ContiguousND<T> from_numpy_impl(const py::array_t<T>& arr, bool copy) {
 
     // deep copy
     if (copy) {
+        py::array_t<T, py::array::c_style | py::array::forcecast> arr_c(arr);
         cnda::ContiguousND<T> result(shape);
-        const T* src = arr.data();  // Read-only access is sufficient
+
+        const T* src = arr_c.data();
         T* dst = result.data();
+
         std::memcpy(dst, src, result.size() * sizeof(T));
         return result;
     }
@@ -143,6 +146,22 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
         
         // Also support __getitem__ with tuple for more Pythonic access
         .def("__getitem__",
+            [](const ContiguousND_T &self, std::size_t index) -> T {
+                // Single index access for 1D arrays
+                if (self.ndim() != 1) {
+                    throw std::out_of_range("Single index only valid for 1D arrays");
+                }
+                
+                const auto& shape = self.shape();
+                if (index >= shape[0]) {
+                    throw std::out_of_range("Index out of bounds");
+                }
+                
+                return self.data()[index];
+            },
+            "Get element at given index (1D arrays)")
+        
+        .def("__getitem__",
             [](const ContiguousND_T &self, py::tuple indices) -> T {
                 std::vector<std::size_t> idx_vec;
                 for (auto idx : indices) {
@@ -168,6 +187,22 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                 return self.data()[offset];
             },
             "Get element at given indices")
+        
+        .def("__setitem__",
+            [](ContiguousND_T &self, std::size_t index, T value) {
+                // Single index access for 1D arrays
+                if (self.ndim() != 1) {
+                    throw std::out_of_range("Single index only valid for 1D arrays");
+                }
+                
+                const auto& shape = self.shape();
+                if (index >= shape[0]) {
+                    throw std::out_of_range("Index out of bounds");
+                }
+                
+                self.data()[index] = value;
+            },
+            "Set element at given index (1D arrays)")
         
         .def("__setitem__",
             [](ContiguousND_T &self, py::tuple indices, T value) {
