@@ -13,7 +13,7 @@ target_include_directories(cnda_headers INTERFACE
     $<INSTALL_INTERFACE:include>)
 
 # Python bindings (required)
-find_package(Python 3.9 COMPONENTS Interpreter Development REQUIRED)
+find_package(Python 3.9...4.0 COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 
 # Create Python module
@@ -72,7 +72,9 @@ if (BUILD_TESTING)
       message(STATUS "pytest found - Python tests enabled")
       
       # Set PYTHONPATH for tests to find the built module
-      if (WIN32)
+      # On Windows, if building via setup.py (CNDA_PYTHON_OUTPUT_DIR set), 
+      # the module is directly in _cnda_output_dir without /Release subdirectory
+      if (WIN32 AND NOT DEFINED CNDA_PYTHON_OUTPUT_DIR)
         set(PYTHON_TEST_PATH "${_cnda_output_dir}/$<CONFIG>")
       else()
         set(PYTHON_TEST_PATH "${_cnda_output_dir}")
