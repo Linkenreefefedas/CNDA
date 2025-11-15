@@ -22,29 +22,33 @@ from setuptools.command.build_ext import build_ext
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
-        Extension.__init__(self, name, sources=[])
+        super().__init__(name, sources=[])
         self.sourcedir = os.path.abspath(sourcedir)
 
 
 class CMakeBuild(build_ext):
     def build_extension(self, ext):
+        import pybind11
+        
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         
         # required for auto-detection of auxiliary "native" libs
         if not extdir.endswith(os.path.sep):
             extdir += os.path.sep
 
+        pybind11_dir = pybind11.get_cmake_dir()
+
         cmake_args = [
-            f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}',
+            f'-DCNDA_PYTHON_OUTPUT_DIR={extdir}',
             f'-DPYTHON_EXECUTABLE={sys.executable}',
             '-DBUILD_TESTING=OFF',
+            f'-Dpybind11_DIR={pybind11_dir}',
         ]
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
 
         if sys.platform.startswith('win'):
-            cmake_args += [f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{cfg.upper()}={extdir}']
             if sys.maxsize > 2**32:
                 cmake_args += ['-A', 'x64']
             build_args += ['--', '/m']
