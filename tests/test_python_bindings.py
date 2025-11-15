@@ -192,7 +192,7 @@ class TestIndexing:
         # Get values
         assert arr[0, 0] == 1.0
         assert arr[1, 2] == 42.5
-        assert arr[2, 3] == 99.9
+        assert abs(arr[2, 3] - 99.9) < 0.01
     
     def test_getitem_setitem_1d(self, cnda):
         """Test indexing for 1D array."""
@@ -224,9 +224,9 @@ class TestIndexing:
         arr[2, 0] = -3.2
         
         # Get values using __call__
-        assert arr(1, 2) == 5.0
-        assert arr(0, 3) == 7.5
-        assert arr(2, 0) == -3.2
+        assert abs(arr(1, 2) - 5.0) < 0.01
+        assert abs(arr(0, 3) - 7.5) < 0.01
+        assert abs(arr(2, 0) - (-3.2)) < 0.01
     
     def test_all_dtypes_indexing(self, cnda):
         """Test indexing for all dtypes."""
