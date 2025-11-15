@@ -8,62 +8,64 @@
 
 namespace py = pybind11;
 
-// Helper to get NumPy dtype format string for C++ types
-template<typename T>
-std::string get_numpy_dtype() {
-    if (std::is_same<T, float>::value) return "f";
-    if (std::is_same<T, double>::value) return "d";
-    if (std::is_same<T, std::int32_t>::value) return "i";
-    if (std::is_same<T, std::int64_t>::value) return "q";
-    throw std::runtime_error("Unsupported dtype");
-}
-
 // Helper function to implement from_numpy logic (used by both dtype-specific and generic functions)
 template<typename T>
-cnda::ContiguousND<T> from_numpy_impl(py::array_t<T> arr, bool copy) {
+cnda::ContiguousND<T> from_numpy_impl(const py::array_t<T>& arr, bool copy) {
+    
+    // Extract shape
+    std::vector<std::size_t> shape;
+    shape.reserve(static_cast<std::size_t>(arr.ndim()));
+    for (ssize_t i = 0; i < arr.ndim(); ++i) {
+        shape.push_back(static_cast<std::size_t>(arr.shape(i)));
+    }
+
+    // deep copy
+    if (copy) {
+        cnda::ContiguousND<T> result(shape);
+        const T* src = arr.data();  // Read-only access is sufficient
+        T* dst = result.data();
+        std::memcpy(dst, src, result.size() * sizeof(T));
+        return result;
+    }
+
+    // zero-copy
     // Check if array is C-contiguous
-    if (!copy && !(arr.flags() & py::array::c_style)) {
+    if (!(arr.flags() & py::array::c_style)) {
         throw std::invalid_argument(
             "from_numpy with copy=False requires C-contiguous (row-major) array. "
             "Use copy=True to force a copy, or ensure the input array is C-contiguous."
         );
     }
-    
-    // Extract shape
-    std::vector<std::size_t> shape;
+
+    // Additional stride validation for safety
+    cnda::ContiguousND<T> tmp(shape);
+    const auto& expected = tmp.strides();
     for (ssize_t i = 0; i < arr.ndim(); ++i) {
-        shape.push_back(static_cast<std::size_t>(arr.shape(i)));
-    }
-    
-    // Create ContiguousND with the shape
-    cnda::ContiguousND<T> result(shape);
-    
-    // Copy data from NumPy array
-    const T* src = arr.data();
-    T* dst = result.data();
-    std::memcpy(dst, src, result.size() * sizeof(T));
-    
-    if (!copy) {
-        // Verify strides match (element strides)
-        bool strides_match = true;
-        const auto& expected_strides = result.strides();
-        for (ssize_t i = 0; i < arr.ndim(); ++i) {
-            ssize_t numpy_stride_elements = arr.strides(i) / sizeof(T);
-            if (numpy_stride_elements != static_cast<ssize_t>(expected_strides[i])) {
-                strides_match = false;
-                break;
-            }
-        }
-        
-        if (!strides_match) {
+        auto stride_elems = arr.strides(i) / static_cast<ssize_t>(sizeof(T));
+        if (stride_elems != static_cast<ssize_t>(expected[static_cast<std::size_t>(i)])) {
             throw std::invalid_argument(
-                "from_numpy with copy=False requires row-major strides. "
-                "The input array has non-standard strides. Use copy=True."
+                "from_numpy(copy=False) requires standard row-major strides. "
+                "The input has non-standard strides; use copy=True."
             );
         }
     }
-    
-    return result;
+
+    T* data_ptr = const_cast<T*>(arr.data());  // Need mutable access for zero-copy view
+
+    struct NumpyOwner {
+        py::array arr;
+        explicit NumpyOwner(py::array a) : arr(std::move(a)) {}
+    };
+
+    // Use shared_ptr constructor with custom deleter for better exception safety
+    std::shared_ptr<void> owner(
+        new NumpyOwner(py::array(arr)),  // Explicitly copy py::array to extend lifetime
+        [](void* p) {
+            delete static_cast<NumpyOwner*>(p);
+        }
+    );
+
+    return cnda::ContiguousND<T>(std::move(shape), data_ptr, std::move(owner));
 }
 
 // Helper function to bind a specific dtype variant
