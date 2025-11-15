@@ -215,13 +215,13 @@ class TestIndexing:
         assert arr[1, 2, 3] == 123.0
     
     def test_call_operator(self, cnda):
-        """Test __call__ operator for element access."""
+        """Test __call__ operator for element access (read-only in Python)."""
         arr = cnda.ContiguousND_f32([3, 4])
         
-        # Set values using __call__
-        arr(1, 2) = 5.0
-        arr(0, 3) = 7.5
-        arr(2, 0) = -3.2
+        # Set values using square brackets
+        arr[1, 2] = 5.0
+        arr[0, 3] = 7.5
+        arr[2, 0] = -3.2
         
         # Get values using __call__
         assert arr(1, 2) == 5.0

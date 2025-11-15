@@ -170,8 +170,11 @@ class TestFromNumpyDeepCopy:
         
         # Should work with copy=True
         arr = cnda.from_numpy_f32(x, copy=True)
+        # After transpose: x.T[0,0]=1.0, x.T[0,1]=3.0, x.T[1,0]=2.0, x.T[1,1]=4.0
         assert arr[0, 0] == 1.0
+        assert arr[0, 1] == 3.0
         assert arr[1, 0] == 2.0
+        assert arr[1, 1] == 4.0
     
     def test_sliced_array_with_copy(self, np, cnda):
         """Test that copy=True works with sliced (non-contiguous) arrays."""
