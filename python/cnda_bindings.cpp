@@ -15,7 +15,7 @@ cnda::ContiguousND<T> from_numpy_impl(const py::array_t<T>& arr, bool copy) {
     // Extract shape
     std::vector<std::size_t> shape;
     shape.reserve(static_cast<std::size_t>(arr.ndim()));
-    for (ssize_t i = 0; i < arr.ndim(); ++i) {
+    for (py::ssize_t i = 0; i < arr.ndim(); ++i) {
         shape.push_back(static_cast<std::size_t>(arr.shape(i)));
     }
 
@@ -43,9 +43,9 @@ cnda::ContiguousND<T> from_numpy_impl(const py::array_t<T>& arr, bool copy) {
     // Additional stride validation for safety
     cnda::ContiguousND<T> tmp(shape);
     const auto& expected = tmp.strides();
-    for (ssize_t i = 0; i < arr.ndim(); ++i) {
-        auto stride_elems = arr.strides(i) / static_cast<ssize_t>(sizeof(T));
-        if (stride_elems != static_cast<ssize_t>(expected[static_cast<std::size_t>(i)])) {
+    for (py::ssize_t i = 0; i < arr.ndim(); ++i) {
+        auto stride_elems = arr.strides(i) / static_cast<py::ssize_t>(sizeof(T));
+        if (stride_elems != static_cast<py::ssize_t>(expected[static_cast<std::size_t>(i)])) {
             throw std::invalid_argument(
                 "from_numpy(copy=False) requires standard row-major strides. "
                 "The input has non-standard strides; use copy=True."
@@ -259,9 +259,9 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                 
                 if (copy) {
                     // Deep copy: create new NumPy array and copy data
-                    std::vector<ssize_t> shape_ssize;
+                    std::vector<py::ssize_t> shape_ssize;
                     for (auto s : self.shape()) {
-                        shape_ssize.push_back(static_cast<ssize_t>(s));
+                        shape_ssize.push_back(static_cast<py::ssize_t>(s));
                     }
                     
                     // Create NumPy array with C-contiguous layout
@@ -275,16 +275,16 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                     return result;
                 } else {
                     // Zero-copy: create view that keeps Python object alive
-                    std::vector<ssize_t> shape_ssize;
-                    std::vector<ssize_t> strides_bytes;
+                    std::vector<py::ssize_t> shape_ssize;
+                    std::vector<py::ssize_t> strides_bytes;
                     
                     for (auto s : self.shape()) {
-                        shape_ssize.push_back(static_cast<ssize_t>(s));
+                        shape_ssize.push_back(static_cast<py::ssize_t>(s));
                     }
                     
                     // Convert element strides to byte strides
                     for (auto s : self.strides()) {
-                        strides_bytes.push_back(static_cast<ssize_t>(s * sizeof(T)));
+                        strides_bytes.push_back(static_cast<py::ssize_t>(s * sizeof(T)));
                     }
                     
                     T* data_ptr = self.data();
