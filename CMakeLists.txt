@@ -71,34 +71,23 @@ if (BUILD_TESTING)
     if (PYTEST_RESULT EQUAL 0)
       message(STATUS "pytest found - Python tests enabled")
       
-      # Set PYTHONPATH for tests to find the built module
-      # On Windows, if building via setup.py (CNDA_PYTHON_OUTPUT_DIR set), 
-      # the module is directly in _cnda_output_dir without /Release subdirectory
-      if (WIN32 AND NOT DEFINED CNDA_PYTHON_OUTPUT_DIR)
-        set(PYTHON_TEST_PATH "${_cnda_output_dir}/$<CONFIG>")
-      else()
-        set(PYTHON_TEST_PATH "${_cnda_output_dir}")
-      endif()
-      
       # Add Python binding tests
       add_test(
         NAME test_python_bindings
-        COMMAND ${Python_EXECUTABLE} -m pytest 
+        COMMAND ${CMAKE_COMMAND} -E env
+                "PYTHONPATH=$<TARGET_FILE_DIR:cnda>"
+                ${Python_EXECUTABLE} -m pytest 
                 ${CMAKE_SOURCE_DIR}/tests/test_python_bindings.py -v
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
       )
       
       add_test(
         NAME test_numpy_interop
-        COMMAND ${Python_EXECUTABLE} -m pytest 
+        COMMAND ${CMAKE_COMMAND} -E env
+                "PYTHONPATH=$<TARGET_FILE_DIR:cnda>"
+                ${Python_EXECUTABLE} -m pytest 
                 ${CMAKE_SOURCE_DIR}/tests/test_numpy_interop.py -v
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      )
-      
-      # Set PYTHONPATH environment for tests
-      set_tests_properties(test_python_bindings test_numpy_interop
-        PROPERTIES
-          ENVIRONMENT "PYTHONPATH=${PYTHON_TEST_PATH}"
       )
     else()
       message(WARNING "pytest not found - Python tests disabled. Install with: pip install pytest")

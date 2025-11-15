@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            export PYTHONPATH="build/python/${{ matrix.build_type }}:$PYTHONPATH"
+            export PYTHONPATH="build/python/${{ matrix.build_type }};$PYTHONPATH"
           else
             export PYTHONPATH="build/python:$PYTHONPATH"
           fi
