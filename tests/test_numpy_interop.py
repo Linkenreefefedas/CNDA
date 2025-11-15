@@ -13,11 +13,6 @@ import sys
 import os
 import pytest
 
-# Add build directory to path
-build_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'build', 'python', 'Release')
-if os.path.exists(build_dir):
-    sys.path.insert(0, build_dir)
-
 
 @pytest.fixture(scope="module")
 def np():
