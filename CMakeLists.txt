@@ -37,6 +37,17 @@ set_target_properties(cnda PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY "${_cnda_output_dir}"
 )
 
+# On Windows with multi-config generators (VS), prevent adding /Release or /Debug subdirectory
+# when CNDA_PYTHON_OUTPUT_DIR is set (i.e., when building via setup.py)
+if (DEFINED CNDA_PYTHON_OUTPUT_DIR)
+  foreach(config_type ${CMAKE_CONFIGURATION_TYPES})
+    string(TOUPPER ${config_type} config_type_upper)
+    set_target_properties(cnda PROPERTIES
+      LIBRARY_OUTPUT_DIRECTORY_${config_type_upper} "${_cnda_output_dir}"
+    )
+  endforeach()
+endif()
+
 message(STATUS "Python ${Python_VERSION} found")
 message(STATUS "pybind11 ${pybind11_VERSION} found")
 message(STATUS "Building Python bindings for cnda")
