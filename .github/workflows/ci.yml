@@ -46,12 +46,11 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            export PYTHONPATH="build/python/${{ matrix.build_type }};$PYTHONPATH"
+            export PYTHONPATH="build/python/${{ matrix.build_type }}:$PYTHONPATH"
           else
             export PYTHONPATH="build/python:$PYTHONPATH"
           fi
-          pytest tests/test_python_bindings.py -v
-          pytest tests/test_numpy_interop.py -v
+          pytest tests/ -v
 
   build-test-setuppy:
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }} / setup.py
@@ -82,5 +81,4 @@ jobs:
 
       - name: Test Python Bindings (setup.py build)
         run: |
-          pytest tests/test_python_bindings.py -v
-          pytest tests/test_numpy_interop.py -v
+          pytest tests/ -v
