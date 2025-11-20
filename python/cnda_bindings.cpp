@@ -125,9 +125,11 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                     idx_vec.push_back(idx.cast<std::size_t>());
                 }
                 
+                #ifdef CNDA_BOUNDS_CHECK
                 if (idx_vec.size() != self.ndim()) {
                     throw std::out_of_range("Number of indices does not match ndim");
                 }
+                #endif
                 
                 // Compute offset using strides
                 std::size_t offset = 0;
@@ -135,9 +137,11 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                 const auto& strides = self.strides();
                 
                 for (size_t i = 0; i < idx_vec.size(); ++i) {
+                    #ifdef CNDA_BOUNDS_CHECK
                     if (idx_vec[i] >= shape[i]) {
                         throw std::out_of_range("Index out of bounds");
                     }
+                    #endif
                     offset += idx_vec[i] * strides[i];
                 }
                 
@@ -149,6 +153,7 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
         // Also support __getitem__ with tuple for more Pythonic access
         .def("__getitem__",
             [](const ContiguousND_T &self, std::size_t index) -> T {
+                #ifdef CNDA_BOUNDS_CHECK
                 // Single index access for 1D arrays
                 if (self.ndim() != 1) {
                     throw std::out_of_range("Single index only valid for 1D arrays");
@@ -158,6 +163,7 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                 if (index >= shape[0]) {
                     throw std::out_of_range("Index out of bounds");
                 }
+                #endif
                 
                 return self.data()[index];
             },
@@ -170,9 +176,11 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                     idx_vec.push_back(idx.cast<std::size_t>());
                 }
                 
+                #ifdef CNDA_BOUNDS_CHECK
                 if (idx_vec.size() != self.ndim()) {
                     throw std::out_of_range("Number of indices does not match ndim");
                 }
+                #endif
                 
                 // Compute offset using strides
                 std::size_t offset = 0;
@@ -180,9 +188,11 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                 const auto& strides = self.strides();
                 
                 for (size_t i = 0; i < idx_vec.size(); ++i) {
+                    #ifdef CNDA_BOUNDS_CHECK
                     if (idx_vec[i] >= shape[i]) {
                         throw std::out_of_range("Index out of bounds");
                     }
+                    #endif
                     offset += idx_vec[i] * strides[i];
                 }
                 
@@ -192,6 +202,7 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
         
         .def("__setitem__",
             [](ContiguousND_T &self, std::size_t index, T value) {
+                #ifdef CNDA_BOUNDS_CHECK
                 // Single index access for 1D arrays
                 if (self.ndim() != 1) {
                     throw std::out_of_range("Single index only valid for 1D arrays");
@@ -201,6 +212,7 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                 if (index >= shape[0]) {
                     throw std::out_of_range("Index out of bounds");
                 }
+                #endif
                 
                 self.data()[index] = value;
             },
@@ -213,9 +225,11 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                     idx_vec.push_back(idx.cast<std::size_t>());
                 }
                 
+                #ifdef CNDA_BOUNDS_CHECK
                 if (idx_vec.size() != self.ndim()) {
                     throw std::out_of_range("Number of indices does not match ndim");
                 }
+                #endif
                 
                 // Compute offset using strides
                 std::size_t offset = 0;
@@ -223,9 +237,11 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                 const auto& strides = self.strides();
                 
                 for (size_t i = 0; i < idx_vec.size(); ++i) {
+                    #ifdef CNDA_BOUNDS_CHECK
                     if (idx_vec[i] >= shape[i]) {
                         throw std::out_of_range("Index out of bounds");
                     }
+                    #endif
                     offset += idx_vec[i] * strides[i];
                 }
                 

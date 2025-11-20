@@ -410,51 +410,47 @@ class TestAtMethod:
 # ==============================================================================
 
 class TestBoundsChecking:
-    """Test bounds checking and error handling."""
+    """Test bounds checking and error handling.
     
+    Note: Bounds checking tests for __getitem__/__setitem__/__call__ are only
+    enforced when CNDA_BOUNDS_CHECK is defined. The .at() method ALWAYS checks.
+    """
+    
+    @pytest.mark.bounds_check_required
     def test_out_of_bounds_first_dim(self, cnda):
-        """Test out-of-bounds on first dimension raises error."""
+        """Test out-of-bounds on first dimension raises error (requires CNDA_BOUNDS_CHECK)."""
         arr = cnda.ContiguousND_f32([3, 4])
         
-        with pytest.raises(IndexError):  # Should raise IndexError
+        with pytest.raises(IndexError):
             _ = arr[3, 0]
     
+    @pytest.mark.bounds_check_required
     def test_out_of_bounds_second_dim(self, cnda):
-        """Test out-of-bounds on second dimension raises error."""
+        """Test out-of-bounds on second dimension raises error (requires CNDA_BOUNDS_CHECK)."""
         arr = cnda.ContiguousND_f32([3, 4])
         
         with pytest.raises(IndexError):
             _ = arr[0, 4]
     
-    def test_out_of_bounds_negative(self, cnda):
-        """Test negative indices (if not supported) raise error."""
-        arr = cnda.ContiguousND_f32([3, 4])
-        
-        # Python negative indexing may not be supported in C++ bindings
-        # This tests the current behavior
-        try:
-            _ = arr[-1, 0]
-            # If it works, that's fine (implementation-dependent)
-        except Exception:
-            # If it raises an error, that's also acceptable
-            pass
-    
+    @pytest.mark.bounds_check_required
     def test_wrong_ndim_too_few(self, cnda):
-        """Test too few indices raises error."""
+        """Test too few indices raises error (requires CNDA_BOUNDS_CHECK)."""
         arr = cnda.ContiguousND_f32([3, 4])
         
         with pytest.raises(IndexError):
             _ = arr[0]
     
+    @pytest.mark.bounds_check_required
     def test_wrong_ndim_too_many(self, cnda):
-        """Test too many indices raises error."""
+        """Test too many indices raises error (requires CNDA_BOUNDS_CHECK)."""
         arr = cnda.ContiguousND_f32([3, 4])
         
         with pytest.raises(IndexError):
             _ = arr[0, 0, 0]
     
+    @pytest.mark.bounds_check_required
     def test_setitem_out_of_bounds(self, cnda):
-        """Test __setitem__ with out-of-bounds raises error."""
+        """Test __setitem__ with out-of-bounds raises error (requires CNDA_BOUNDS_CHECK)."""
         arr = cnda.ContiguousND_f32([3, 4])
         
         with pytest.raises(IndexError):
