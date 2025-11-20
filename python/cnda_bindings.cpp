@@ -34,7 +34,8 @@ cnda::ContiguousND<T> from_numpy_impl(const py::array_t<T>& arr, bool copy) {
     // zero-copy
     // Check if array is C-contiguous
     if (!(arr.flags() & py::array::c_style)) {
-        throw std::invalid_argument(
+        // ValueError for shape/layout mismatch
+        throw py::value_error(
             "from_numpy with copy=False requires C-contiguous (row-major) array. "
             "Use copy=True to force a copy, or ensure the input array is C-contiguous."
         );
@@ -46,7 +47,8 @@ cnda::ContiguousND<T> from_numpy_impl(const py::array_t<T>& arr, bool copy) {
     for (py::ssize_t i = 0; i < arr.ndim(); ++i) {
         auto stride_elems = arr.strides(i) / static_cast<py::ssize_t>(sizeof(T));
         if (stride_elems != static_cast<py::ssize_t>(expected[static_cast<std::size_t>(i)])) {
-            throw std::invalid_argument(
+            // ValueError for shape/layout mismatch
+            throw py::value_error(
                 "from_numpy(copy=False) requires standard row-major strides. "
                 "The input has non-standard strides; use copy=True."
             );
@@ -230,6 +232,32 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                 self.data()[offset] = value;
             },
             "Set element at given indices")
+
+        .def("at",
+            [](const ContiguousND_T &self, py::tuple indices) -> T {
+                std::vector<std::size_t> idx_vec;
+                for (auto idx : indices) {
+                    idx_vec.push_back(idx.cast<std::size_t>());
+                }
+                // pybind11 can't automatically convert py::tuple to std::initializer_list,
+                // so we convert to std::vector first and then call a helper.
+                // To avoid creating a new C++ helper, we can just call the existing `at`
+                // by creating an initializer list, but that's complicated.
+                // The simplest is to just re-implement the logic here, which is what is done for other methods.
+                if (idx_vec.size() != self.ndim()) {
+                    throw std::out_of_range("at(): rank mismatch");
+                }
+                std::size_t offset = 0;
+                const auto& shape = self.shape();
+                const auto& strides = self.strides();
+                for (size_t i = 0; i < idx_vec.size(); ++i) {
+                    if (idx_vec[i] >= shape[i]) {
+                        throw std::out_of_range("at(): index out of bounds");
+                    }
+                    offset += idx_vec[i] * strides[i];
+                }
+                return self.data()[offset];
+            }, "Safe access with bounds checking")
         
         // String representation
         .def("__repr__",
@@ -363,9 +391,9 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
             Raises
             ------
             TypeError
-                If dtype does not match.
+                If dtype does not match (for generic from_numpy).
             ValueError
-                If copy=False and array is not C-contiguous.
+                If copy=False and array is not C-contiguous (layout/shape mismatch).
             
             Notes
             -----
@@ -391,6 +419,40 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
 PYBIND11_MODULE(cnda, m) {
     m.doc() = "CNDA: Contiguous N-Dimensional Array library with zero-copy NumPy interoperability";
     
+    // Register exception translators for proper Python error types
+    // std::out_of_range -> IndexError (out-of-bounds access)
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) {
+                std::rethrow_exception(p);
+            }
+        } catch (const std::out_of_range &e) {
+            PyErr_SetString(PyExc_IndexError, e.what());
+        }
+    });
+    
+    // std::invalid_argument -> ValueError (for shape/layout mismatches not caught by py::value_error)
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) {
+                std::rethrow_exception(p);
+            }
+        } catch (const std::invalid_argument &e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        }
+    });
+    
+    // std::runtime_error -> RuntimeError (for lifetime/ownership issues)
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) {
+                std::rethrow_exception(p);
+            }
+        } catch (const std::runtime_error &e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+    });
+
     // Export version
 #ifdef CNDA_VERSION
     m.attr("__version__") = CNDA_VERSION;
