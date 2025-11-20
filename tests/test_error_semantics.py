@@ -232,6 +232,7 @@ class TestIndexErrorBoundsCheck:
         ),
     ]
 
+    @pytest.mark.bounds_check_required
     @pytest.mark.parametrize("arr_factory, operation", _OUT_OF_BOUNDS_CASES)
     def test_out_of_bounds_ops_raise_indexerror(self, cnda, arr_factory, operation):
         """All invalid coordinate accesses must raise IndexError."""
@@ -285,6 +286,7 @@ class TestIndexErrorRankMismatch:
         pytest.param(lambda arr: arr(0, 0, 0), id="call"),
     ]
 
+    @pytest.mark.bounds_check_required
     @pytest.mark.parametrize("operation", _TOO_FEW_CASES)
     def test_rank_mismatch_too_few_indices(self, cnda, operation):
         """Too few indices must raise IndexError."""
@@ -293,6 +295,7 @@ class TestIndexErrorRankMismatch:
         with pytest.raises(IndexError, match="rank mismatch|Number of indices|Single index only valid"):
             operation(arr)
 
+    @pytest.mark.bounds_check_required
     @pytest.mark.parametrize("operation", _TOO_MANY_CASES)
     def test_rank_mismatch_too_many_indices(self, cnda, operation):
         """Too many indices must raise IndexError."""
@@ -406,7 +409,10 @@ class TestMixedErrorTypes:
         with pytest.raises(ValueError):
             x_bad_layout = np.array([[1.0, 2.0]], dtype=np.float32, order='F')
             cnda.from_numpy_f32(x_bad_layout, copy=False)
-        
+    
+    @pytest.mark.bounds_check_required
+    def test_indexerror_independent(self, cnda):
+        """Test that IndexError is raised for out-of-bounds access (requires CNDA_BOUNDS_CHECK)."""
         # IndexError: out of bounds
         with pytest.raises(IndexError):
             arr = cnda.ContiguousND_f32([2, 2])
@@ -444,6 +450,7 @@ class TestAllDtypesErrors:
         with pytest.raises(ValueError, match="C-contiguous|strides"):
             cnda.from_numpy_i64(x, copy=False)
     
+    @pytest.mark.bounds_check_required
     def test_all_dtypes_bounds_error(self, cnda):
         """Test IndexError for out-of-bounds on all dtypes."""
         test_cases = [
