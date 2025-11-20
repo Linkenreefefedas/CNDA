@@ -35,10 +35,10 @@ cnda::ContiguousND<T> from_numpy_impl(const py::array_t<T>& arr, bool copy) {
     // Check if array is C-contiguous
     if (!(arr.flags() & py::array::c_style)) {
         // ValueError for shape/layout mismatch
-        throw py::value_error(
+        PyErr_SetString(PyExc_ValueError,
             "from_numpy with copy=False requires C-contiguous (row-major) array. "
-            "Use copy=True to force a copy, or ensure the input array is C-contiguous."
-        );
+            "Use copy=True to force a copy, or ensure the input array is C-contiguous.");
+        throw py::error_already_set();
     }
 
     // Additional stride validation for safety
@@ -48,10 +48,10 @@ cnda::ContiguousND<T> from_numpy_impl(const py::array_t<T>& arr, bool copy) {
         auto stride_elems = arr.strides(i) / static_cast<py::ssize_t>(sizeof(T));
         if (stride_elems != static_cast<py::ssize_t>(expected[static_cast<std::size_t>(i)])) {
             // ValueError for shape/layout mismatch
-            throw py::value_error(
+            PyErr_SetString(PyExc_ValueError,
                 "from_numpy(copy=False) requires standard row-major strides. "
-                "The input has non-standard strides; use copy=True."
-            );
+                "The input has non-standard strides; use copy=True.");
+            throw py::error_already_set();
         }
     }
 
