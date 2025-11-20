@@ -224,25 +224,66 @@ python tests/test_python_bindings.py
 
 ## Error Handling
 
-The bindings perform bounds checking and raise Python exceptions for invalid operations:
+The bindings use specific Python exception types for different error conditions:
+
+### Error Semantics
+
+CNDA follows a strict error semantic policy that maps C++ exceptions to appropriate Python exception types:
+
+| Python Exception | Error Condition | Example |
+|-----------------|-----------------|---------|
+| `TypeError` | Unsupported dtype mismatch | Passing uint8 array to `from_numpy()` |
+| `ValueError` | Shape/layout mismatch | Non-C-contiguous array with `copy=False` |
+| `RuntimeError` | Invalid lifetime/ownership | Capsule or memory management errors |
+| `IndexError` | Out-of-bounds or rank mismatch | Accessing `arr[3, 0]` on shape `[3, 4]` |
+
+### Exception Examples
 
 ```python
 import cnda
+import numpy as np
 
-arr = cnda.ContiguousND_f32([3, 4])
-
-# Out of bounds - raises RuntimeError
+# TypeError: Unsupported dtype
 try:
+    x = np.array([[1, 2]], dtype=np.uint8)
+    arr = cnda.from_numpy(x, copy=False)
+except TypeError as e:
+    print(f"TypeError: {e}")
+    # Output: TypeError: Unsupported dtype: uint8
+
+# ValueError: Layout mismatch
+try:
+    x = np.array([[1.0, 2.0]], dtype=np.float32, order='F')
+    arr = cnda.from_numpy_f32(x, copy=False)
+except ValueError as e:
+    print(f"ValueError: {e}")
+    # Output: ValueError: from_numpy with copy=False requires C-contiguous array
+
+# IndexError: Out of bounds
+try:
+    arr = cnda.ContiguousND_f32([3, 4])
     val = arr[3, 0]
-except RuntimeError as e:
-    print(f"Error: {e}")
+except IndexError as e:
+    print(f"IndexError: {e}")
+    # Output: IndexError: Index out of bounds
 
-# Wrong number of indices - raises RuntimeError
+# IndexError: Rank mismatch
 try:
-    val = arr[0]
-except RuntimeError as e:
-    print(f"Error: {e}")
+    arr = cnda.ContiguousND_f32([3, 4])
+    val = arr[0]  # Wrong number of indices
+except IndexError as e:
+    print(f"IndexError: {e}")
+    # Output: IndexError: Number of indices does not match ndim
 ```
+
+### C++ Exception Mapping
+
+The Python bindings automatically translate C++ exceptions to Python exceptions:
+
+- `std::out_of_range` → `IndexError`
+- `std::invalid_argument` → `ValueError`
+- `std::runtime_error` → `RuntimeError`
+- `pybind11::type_error` → `TypeError`
 
 ## Memory Layout
 

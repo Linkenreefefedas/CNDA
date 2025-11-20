@@ -45,6 +45,10 @@ class CMakeBuild(build_ext):
             f'-Dpybind11_DIR={pybind11_dir}',
         ]
 
+        # Support CNDA_BOUNDS_CHECK via environment variable
+        if os.environ.get('CNDA_BOUNDS_CHECK', '').lower() in ('1', 'on', 'true', 'yes'):
+            cmake_args.append('-DCNDA_BOUNDS_CHECK=ON')
+
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
 

@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  build-test:
-    name: ${{ matrix.os }} / Python ${{ matrix.python-version }} / ${{ matrix.build_type }}
+  build-test-cmake:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }} / CMake${{ matrix.bounds_check && ' + BOUNDS_CHECK' || '' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -15,6 +15,7 @@ jobs:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14' ]
         build_type: [ Release ]
+        bounds_check: [ false, true ]
 
     steps:
       - name: Checkout
@@ -33,34 +34,24 @@ jobs:
       - name: Configure (CMake)
         run: |
           PYBIND11_DIR=$(python -c "import pybind11; print(pybind11.get_cmake_dir())")
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -Dpybind11_DIR="$PYBIND11_DIR"
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DBUILD_TESTING=ON -Dpybind11_DIR="$PYBIND11_DIR" ${{ matrix.bounds_check && '-DCNDA_BOUNDS_CHECK=ON' || '' }}
         shell: bash
 
       - name: Build
         run: cmake --build build --config ${{ matrix.build_type }} -j
 
-      - name: Test C++ (CTest)
+      - name: Test (CTest - includes C++ and Python tests)
         run: ctest --test-dir build --output-on-failure --build-config ${{ matrix.build_type }}
 
-      - name: Test Python Bindings (CMake build)
-        shell: bash
-        run: |
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            export PYTHONPATH="build/python/${{ matrix.build_type }};$PYTHONPATH"
-          else
-            export PYTHONPATH="build/python:$PYTHONPATH"
-          fi
-          pytest tests/test_python_bindings.py -v
-          pytest tests/test_numpy_interop.py -v
-
   build-test-setuppy:
-    name: ${{ matrix.os }} / Python ${{ matrix.python-version }} / setup.py
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }} / setup.py${{ matrix.bounds_check && ' + BOUNDS_CHECK' || '' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14' ]
+        bounds_check: [ false, true ]
 
     steps:
       - name: Checkout
@@ -78,9 +69,10 @@ jobs:
 
       - name: Build and Install via setup.py
         run: |
-          pip install -v .
+          pip install -v ${{ matrix.bounds_check && '--force-reinstall --no-cache-dir' || '' }} .
+        env:
+          CNDA_BOUNDS_CHECK: ${{ matrix.bounds_check && '1' || '0' }}
 
       - name: Test Python Bindings (setup.py build)
         run: |
-          pytest tests/test_python_bindings.py -v
-          pytest tests/test_numpy_interop.py -v
+          pytest tests/ -v ${{ matrix.bounds_check && '' || '-m "not bounds_check_required"' }}

@@ -5,8 +5,8 @@ This test suite covers:
 1. C++ → NumPy: copy=False (zero-copy view) and copy=True (deep copy)
 2. NumPy → C++: copy=False (zero-copy view) and copy=True (deep copy)
 3. Non-C-contiguous arrays (Fortran-order, transposed, sliced)
-4. Unsupported dtypes error handling
-5. All supported dtypes (f32, f64, i32, i64)
+4. All supported dtypes (f32, f64, i32, i64)
+5. Capsule ownership and lifetime safety
 """
 
 import sys
@@ -36,18 +36,27 @@ def cnda():
 class TestFromNumpyZeroCopy:
     """Test from_numpy with copy=False (zero-copy view from NumPy to C++)."""
     
-    def test_f32_c_contiguous(self, np, cnda):
-        """Test zero-copy from C-contiguous float32 NumPy array."""
-        x = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32, order='C')
+    @pytest.mark.parametrize(
+        "dtype_name, func_name",
+        [
+            ("float32", "from_numpy_f32"),
+            ("float64", "from_numpy_f64"),
+            ("int32", "from_numpy_i32"),
+            ("int64", "from_numpy_i64"),
+        ],
+    )
+    def test_c_contiguous_zero_copy(self, np, cnda, dtype_name, func_name):
+        np_dtype = getattr(np, dtype_name)
+        cnda_from_numpy_func = getattr(cnda, func_name)
+        """Test zero-copy from C-contiguous NumPy arrays for all supported dtypes."""
+        x = np.array([[1, 2], [3, 4]], dtype=np_dtype, order='C')
         assert x.flags['C_CONTIGUOUS']
         
-        arr = cnda.from_numpy_f32(x, copy=False)
+        arr = cnda_from_numpy_func(x, copy=False)
         
         # Verify values
-        assert arr[0, 0] == 1.0
-        assert arr[0, 1] == 2.0
-        assert arr[1, 0] == 3.0
-        assert arr[1, 1] == 4.0
+        assert arr[0, 0] == 1
+        assert arr[1, 1] == 4
         
         # Verify shape and metadata
         assert arr.shape == (2, 2)
@@ -55,33 +64,6 @@ class TestFromNumpyZeroCopy:
         assert arr.size == 4
         
         # Verify zero-copy (same memory address)
-        assert arr.data_ptr() == x.ctypes.data
-    
-    def test_f64_c_contiguous(self, np, cnda):
-        """Test zero-copy from C-contiguous float64 NumPy array."""
-        x = np.array([[1.5, 2.5], [3.5, 4.5]], dtype=np.float64, order='C')
-        arr = cnda.from_numpy_f64(x, copy=False)
-        
-        assert arr[0, 0] == 1.5
-        assert arr[1, 1] == 4.5
-        assert arr.data_ptr() == x.ctypes.data
-    
-    def test_i32_c_contiguous(self, np, cnda):
-        """Test zero-copy from C-contiguous int32 NumPy array."""
-        x = np.array([[1, 2], [3, 4]], dtype=np.int32, order='C')
-        arr = cnda.from_numpy_i32(x, copy=False)
-        
-        assert arr[0, 0] == 1
-        assert arr[1, 1] == 4
-        assert arr.data_ptr() == x.ctypes.data
-    
-    def test_i64_c_contiguous(self, np, cnda):
-        """Test zero-copy from C-contiguous int64 NumPy array."""
-        x = np.array([[1, 2], [3, 4]], dtype=np.int64, order='C')
-        arr = cnda.from_numpy_i64(x, copy=False)
-        
-        assert arr[0, 0] == 1
-        assert arr[1, 1] == 4
         assert arr.data_ptr() == x.ctypes.data
     
     def test_generic_from_numpy(self, np, cnda):
@@ -107,7 +89,7 @@ class TestFromNumpyZeroCopy:
         arr_i64 = cnda.from_numpy(x_i64, copy=False)
         assert type(arr_i64).__name__ == 'ContiguousND_i64'
     
-    def test_memory_sharing(self, np, cnda):
+    def test_memory_sharing_from_numpy(self, np, cnda):
         """Test that modifications in NumPy are reflected in C++ (zero-copy)."""
         x = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32, order='C')
         arr = cnda.from_numpy_f32(x, copy=False)
@@ -122,7 +104,7 @@ class TestFromNumpyZeroCopy:
 class TestFromNumpyDeepCopy:
     """Test from_numpy with copy=True (deep copy from NumPy to C++)."""
     
-    def test_f32_deep_copy(self, np, cnda):
+    def test_deep_copy_from_numpy(self, np, cnda):
         """Test deep copy from float32 NumPy array."""
         x = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
         arr = cnda.from_numpy_f32(x, copy=True)
@@ -134,7 +116,7 @@ class TestFromNumpyDeepCopy:
         # Verify it's a copy (different memory addresses)
         assert arr.data_ptr() != x.ctypes.data
     
-    def test_memory_independence(self, np, cnda):
+    def test_memory_independence_on_deep_copy(self, np, cnda):
         """Test that modifications in NumPy don't affect C++ (deep copy)."""
         x = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
         arr = cnda.from_numpy_f32(x, copy=True)
@@ -181,68 +163,6 @@ class TestFromNumpyDeepCopy:
         arr = cnda.from_numpy_f32(x_sliced, copy=True)
         assert arr.shape == (3, 2)
 
-
-class TestFromNumpyNonContiguous:
-    """Test from_numpy with non-C-contiguous arrays (should fail with copy=False)."""
-    
-    def test_fortran_order_error(self, np, cnda):
-        """Test that Fortran-order array raises error with copy=False."""
-        x = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32, order='F')
-        assert not x.flags['C_CONTIGUOUS']
-        
-        with pytest.raises((ValueError, RuntimeError), match="C-contiguous"):
-            cnda.from_numpy_f32(x, copy=False)
-    
-    def test_transposed_array_error(self, np, cnda):
-        """Test that transposed array raises error with copy=False."""
-        x = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32).T
-        assert not x.flags['C_CONTIGUOUS']
-        
-        with pytest.raises((ValueError, RuntimeError), match="C-contiguous"):
-            cnda.from_numpy_f32(x, copy=False)
-    
-    def test_sliced_array_error(self, np, cnda):
-        """Test that sliced (non-contiguous) array raises error with copy=False."""
-        x = np.arange(20, dtype=np.float32).reshape(5, 4)
-        x_sliced = x[::2, ::2]  # Non-contiguous
-        
-        if not x_sliced.flags['C_CONTIGUOUS']:
-            with pytest.raises((ValueError, RuntimeError), match="C-contiguous"):
-                cnda.from_numpy_f32(x_sliced, copy=False)
-
-
-class TestFromNumpyUnsupportedDtype:
-    """Test from_numpy with unsupported dtypes."""
-    
-    def test_uint8_error(self, np, cnda):
-        """Test that uint8 dtype raises TypeError."""
-        x = np.array([[1, 2], [3, 4]], dtype=np.uint8)
-        
-        with pytest.raises(TypeError, match="Unsupported dtype"):
-            cnda.from_numpy(x, copy=False)
-    
-    def test_uint16_error(self, np, cnda):
-        """Test that uint16 dtype raises TypeError."""
-        x = np.array([[1, 2], [3, 4]], dtype=np.uint16)
-        
-        with pytest.raises(TypeError, match="Unsupported dtype"):
-            cnda.from_numpy(x, copy=False)
-    
-    def test_float16_error(self, np, cnda):
-        """Test that float16 dtype raises TypeError."""
-        x = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float16)
-        
-        with pytest.raises(TypeError, match="Unsupported dtype"):
-            cnda.from_numpy(x, copy=False)
-    
-    def test_complex_error(self, np, cnda):
-        """Test that complex dtype raises TypeError."""
-        x = np.array([[1+2j, 3+4j]], dtype=np.complex64)
-        
-        with pytest.raises(TypeError, match="Unsupported dtype"):
-            cnda.from_numpy(x, copy=False)
-
-
 # ==============================================================================
 # C++ → NumPy Tests (to_numpy)
 # ==============================================================================
@@ -250,57 +170,38 @@ class TestFromNumpyUnsupportedDtype:
 class TestToNumpyZeroCopy:
     """Test to_numpy with copy=False (zero-copy view from C++ to NumPy)."""
     
-    def test_f32_zero_copy(self, np, cnda):
-        """Test zero-copy export of float32 array to NumPy."""
-        arr = cnda.ContiguousND_f32([2, 3])
-        arr[0, 0] = 1.0
-        arr[1, 2] = 99.5
+    @pytest.mark.parametrize(
+        "class_name, dtype_name",
+        [
+            ("ContiguousND_f32", "float32"),
+            ("ContiguousND_f64", "float64"),
+            ("ContiguousND_i32", "int32"),
+            ("ContiguousND_i64", "int64"),
+        ],
+    )
+    def test_zero_copy_to_numpy(self, np, cnda, class_name, dtype_name):
+        cnda_class = getattr(cnda, class_name)
+        np_dtype = getattr(np, dtype_name)
+        """Test zero-copy export to NumPy for all supported dtypes."""
+        arr = cnda_class([2, 3])
+        arr[0, 0] = 1
+        arr[1, 2] = 99
         
         np_arr = arr.to_numpy(copy=False)
         
         # Verify values
-        assert np_arr[0, 0] == 1.0
-        assert np_arr[1, 2] == 99.5
+        assert np_arr[0, 0] == 1
+        assert np_arr[1, 2] == 99
         
         # Verify metadata
         assert np_arr.shape == (2, 3)
-        assert np_arr.dtype == np.float32
+        assert np_arr.dtype == np_dtype
         assert np_arr.flags['C_CONTIGUOUS']
         
         # Verify zero-copy (same memory address)
         assert arr.data_ptr() == np_arr.ctypes.data
     
-    def test_f64_zero_copy(self, np, cnda):
-        """Test zero-copy export of float64 array to NumPy."""
-        arr = cnda.ContiguousND_f64([2, 2])
-        arr[0, 0] = 1.5
-        
-        np_arr = arr.to_numpy(copy=False)
-        assert np_arr[0, 0] == 1.5
-        assert np_arr.dtype == np.float64
-        assert arr.data_ptr() == np_arr.ctypes.data
-    
-    def test_i32_zero_copy(self, np, cnda):
-        """Test zero-copy export of int32 array to NumPy."""
-        arr = cnda.ContiguousND_i32([2, 2])
-        arr[0, 0] = 42
-        
-        np_arr = arr.to_numpy(copy=False)
-        assert np_arr[0, 0] == 42
-        assert np_arr.dtype == np.int32
-        assert arr.data_ptr() == np_arr.ctypes.data
-    
-    def test_i64_zero_copy(self, np, cnda):
-        """Test zero-copy export of int64 array to NumPy."""
-        arr = cnda.ContiguousND_i64([2, 2])
-        arr[0, 0] = 9223372036854775807
-        
-        np_arr = arr.to_numpy(copy=False)
-        assert np_arr[0, 0] == 9223372036854775807
-        assert np_arr.dtype == np.int64
-        assert arr.data_ptr() == np_arr.ctypes.data
-    
-    def test_memory_sharing(self, np, cnda):
+    def test_memory_sharing_to_numpy(self, np, cnda):
         """Test that modifications in C++ are reflected in NumPy (zero-copy)."""
         arr = cnda.ContiguousND_f32([2, 2])
         arr[0, 0] = 1.0
@@ -312,42 +213,12 @@ class TestToNumpyZeroCopy:
         
         # Should be reflected in NumPy array (zero-copy)
         assert np_arr[0, 0] == 99.0
-    
-    def test_lifetime_management(self, np, cnda):
-        """Test that NumPy array keeps C++ data alive via capsule."""
-        arr = cnda.ContiguousND_f32([2, 2])
-        arr[0, 0] = 42.0
-        
-        np_arr = arr.to_numpy(copy=False)
-        data_ptr = np_arr.ctypes.data
-        
-        # Delete original C++ reference
-        del arr
-        
-        # NumPy array should still be valid (capsule keeps data alive)
-        assert np_arr[0, 0] == 42.0
-        assert np_arr.ctypes.data == data_ptr
 
 
 class TestToNumpyDeepCopy:
     """Test to_numpy with copy=True (deep copy from C++ to NumPy)."""
     
-    def test_f32_deep_copy(self, np, cnda):
-        """Test deep copy export of float32 array to NumPy."""
-        arr = cnda.ContiguousND_f32([2, 3])
-        arr[0, 0] = 1.0
-        arr[1, 2] = 5.0
-        
-        np_arr = arr.to_numpy(copy=True)
-        
-        # Verify values
-        assert np_arr[0, 0] == 1.0
-        assert np_arr[1, 2] == 5.0
-        
-        # Verify it's a copy (different memory addresses)
-        assert arr.data_ptr() != np_arr.ctypes.data
-    
-    def test_memory_independence(self, np, cnda):
+    def test_memory_independence_on_deep_copy(self, np, cnda):
         """Test that modifications in C++ don't affect NumPy (deep copy)."""
         arr = cnda.ContiguousND_f32([2, 2])
         arr[0, 0] = 1.0

@@ -73,6 +73,41 @@ public:
     }
 
   // -------- operator() overload (N-dimensional) --------
+  // Safe access with bounds checking, mirrors std::vector::at()
+  T& at(std::initializer_list<std::size_t> idxs) {
+      if (idxs.size() != m_ndim) {
+        throw std::out_of_range("at(): rank mismatch");
+      }
+      
+      std::size_t offset = 0;
+      std::size_t axis = 0;
+      for (auto v : idxs) {
+        if (v >= m_shape[axis]) {
+          throw std::out_of_range("at(): index out of bounds");
+        }
+        offset += v * m_strides[axis];
+        ++axis;
+      }
+      return m_data[offset];
+  }
+
+  const T& at(std::initializer_list<std::size_t> idxs) const {
+      if (idxs.size() != m_ndim) {
+        throw std::out_of_range("at() const: rank mismatch");
+      }
+      
+      std::size_t offset = 0;
+      std::size_t axis = 0;
+      for (auto v : idxs) {
+        if (v >= m_shape[axis]) {
+          throw std::out_of_range("at() const: index out of bounds");
+        }
+        offset += v * m_strides[axis];
+        ++axis;
+      }
+      return m_data[offset];
+  }
+
   // Variadic template for N-dimensional access
   template<typename... Indices>
   T& operator()(Indices... indices) {

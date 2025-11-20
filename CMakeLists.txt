@@ -16,6 +16,9 @@ target_include_directories(cnda_headers INTERFACE
 find_package(Python 3.9...4.0 COMPONENTS Interpreter Development REQUIRED)
 find_package(pybind11 CONFIG REQUIRED)
 
+# Option for bounds checking
+option(CNDA_BOUNDS_CHECK "Enable bounds checking" OFF)
+
 # Create Python module
 pybind11_add_module(cnda python/cnda_bindings.cpp)
 
@@ -23,6 +26,11 @@ target_link_libraries(cnda PRIVATE cnda_headers)
 
 # Define version macro
 target_compile_definitions(cnda PRIVATE CNDA_VERSION="${PROJECT_VERSION}")
+
+# Add CNDA_BOUNDS_CHECK if enabled
+if(CNDA_BOUNDS_CHECK)
+  target_compile_definitions(cnda PRIVATE CNDA_BOUNDS_CHECK)
+endif()
 
 # Set output directory (configurable from outside, e.g. setup.py)
 if (DEFINED CNDA_PYTHON_OUTPUT_DIR)
@@ -72,23 +80,28 @@ if (BUILD_TESTING)
       message(STATUS "pytest found - Python tests enabled")
       
       # Add Python binding tests
-      add_test(
-        NAME test_python_bindings
-        COMMAND ${CMAKE_COMMAND} -E env
-                "PYTHONPATH=$<TARGET_FILE_DIR:cnda>"
-                ${Python_EXECUTABLE} -m pytest 
-                ${CMAKE_SOURCE_DIR}/tests/test_python_bindings.py -v
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      )
-      
-      add_test(
-        NAME test_numpy_interop
-        COMMAND ${CMAKE_COMMAND} -E env
-                "PYTHONPATH=$<TARGET_FILE_DIR:cnda>"
-                ${Python_EXECUTABLE} -m pytest 
-                ${CMAKE_SOURCE_DIR}/tests/test_numpy_interop.py -v
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      )
+      # Run all Python tests, filtering based on CNDA_BOUNDS_CHECK setting
+      if(CNDA_BOUNDS_CHECK)
+        # With bounds checking: run all tests
+        add_test(
+          NAME test_python_bindings
+          COMMAND ${CMAKE_COMMAND} -E env
+                  "PYTHONPATH=$<TARGET_FILE_DIR:cnda>"
+                  ${Python_EXECUTABLE} -m pytest 
+                  ${CMAKE_SOURCE_DIR}/tests/ -v
+          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+      else()
+        # Without bounds checking: skip tests requiring bounds checks
+        add_test(
+          NAME test_python_bindings
+          COMMAND ${CMAKE_COMMAND} -E env
+                  "PYTHONPATH=$<TARGET_FILE_DIR:cnda>"
+                  ${Python_EXECUTABLE} -m pytest 
+                  ${CMAKE_SOURCE_DIR}/tests/ -v -m "not bounds_check_required"
+          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        )
+      endif()
     else()
       message(WARNING "pytest not found - Python tests disabled. Install with: pip install pytest")
     endif()
