@@ -507,10 +507,10 @@ PYBIND11_MODULE(cnda, m) {
                 auto typed_arr = py::array_t<std::int64_t>(arr);
                 return py::cast(from_numpy_impl<std::int64_t>(typed_arr, copy));
             } else {
-                throw py::type_error(
-                    "Unsupported dtype: " + py::str(dtype).cast<std::string>() +
-                    ". Supported types: float32, float64, int32, int64"
-                );
+                std::string msg = "Unsupported dtype: " + py::str(dtype).cast<std::string>() +
+                                  ". Supported types: float32, float64, int32, int64";
+                PyErr_SetString(PyExc_TypeError, msg.c_str());
+                throw py::error_already_set();
             }
         },
         py::arg("arr"),
