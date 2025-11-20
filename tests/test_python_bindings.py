@@ -372,6 +372,40 @@ class TestRepr:
 
 
 # ==============================================================================
+# .at() Method Tests
+# ==============================================================================
+
+class TestAtMethod:
+    """Test the .at() method for safe access."""
+
+    def test_at_in_bounds(self, cnda):
+        """Test .at() with in-range indices."""
+        arr = cnda.ContiguousND_f32([3, 4])
+        arr[1, 2] = 42.5
+        assert arr.at((1, 2)) == 42.5
+
+    def test_at_out_of_bounds_first_dim(self, cnda):
+        """Test .at() with out-of-bounds on first dimension raises IndexError."""
+        arr = cnda.ContiguousND_f32([3, 4])
+        with pytest.raises(IndexError, match=r"at\(\): index out of bounds"):
+            arr.at((3, 0))
+
+    def test_at_out_of_bounds_second_dim(self, cnda):
+        """Test .at() with out-of-bounds on second dimension raises IndexError."""
+        arr = cnda.ContiguousND_f32([3, 4])
+        with pytest.raises(IndexError, match=r"at\(\): index out of bounds"):
+            arr.at((0, 4))
+
+    def test_at_wrong_ndim(self, cnda):
+        """Test .at() with wrong number of indices raises IndexError."""
+        arr = cnda.ContiguousND_f32([3, 4])
+        with pytest.raises(IndexError, match=r"at\(\): rank mismatch"):
+            arr.at((1,))
+        with pytest.raises(IndexError, match=r"at\(\): rank mismatch"):
+            arr.at((1, 2, 3))
+
+
+# ==============================================================================
 # Error Handling Tests
 # ==============================================================================
 
@@ -382,14 +416,14 @@ class TestBoundsChecking:
         """Test out-of-bounds on first dimension raises error."""
         arr = cnda.ContiguousND_f32([3, 4])
         
-        with pytest.raises(Exception):  # Should raise out_of_range
+        with pytest.raises(IndexError):  # Should raise IndexError
             _ = arr[3, 0]
     
     def test_out_of_bounds_second_dim(self, cnda):
         """Test out-of-bounds on second dimension raises error."""
         arr = cnda.ContiguousND_f32([3, 4])
         
-        with pytest.raises(Exception):
+        with pytest.raises(IndexError):
             _ = arr[0, 4]
     
     def test_out_of_bounds_negative(self, cnda):
@@ -409,24 +443,24 @@ class TestBoundsChecking:
         """Test too few indices raises error."""
         arr = cnda.ContiguousND_f32([3, 4])
         
-        with pytest.raises(Exception):
+        with pytest.raises(IndexError):
             _ = arr[0]
     
     def test_wrong_ndim_too_many(self, cnda):
         """Test too many indices raises error."""
         arr = cnda.ContiguousND_f32([3, 4])
         
-        with pytest.raises(Exception):
+        with pytest.raises(IndexError):
             _ = arr[0, 0, 0]
     
     def test_setitem_out_of_bounds(self, cnda):
         """Test __setitem__ with out-of-bounds raises error."""
         arr = cnda.ContiguousND_f32([3, 4])
         
-        with pytest.raises(Exception):
+        with pytest.raises(IndexError):
             arr[3, 0] = 1.0
         
-        with pytest.raises(Exception):
+        with pytest.raises(IndexError):
             arr[0, 4] = 1.0
 
 

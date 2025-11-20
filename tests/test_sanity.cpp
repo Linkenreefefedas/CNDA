@@ -146,6 +146,22 @@ TEST_CASE("operator() edge cases", "[op][edge]") {
     }
 }
 
+TEST_CASE("at() method bounds checking", "[at][bounds]") {
+    cnda::ContiguousND<int> a({3, 4});
+
+    // In-bounds access
+    a(1, 2) = 42;
+    REQUIRE(a.at({1, 2}) == 42);
+
+    // Out-of-bounds access
+    REQUIRE_THROWS_AS(a.at({3, 0}), std::out_of_range);
+    REQUIRE_THROWS_AS(a.at({0, 4}), std::out_of_range);
+
+    // Rank mismatch
+    REQUIRE_THROWS_AS(a.at({1}), std::out_of_range);
+    REQUIRE_THROWS_AS(a.at({1, 2, 3}), std::out_of_range);
+}
+
 #ifdef CNDA_BOUNDS_CHECK
 TEST_CASE("bounds checks throw on invalid indices", "[bounds]") {
     cnda::ContiguousND<int> a2({3, 4});
