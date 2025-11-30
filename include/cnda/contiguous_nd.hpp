@@ -146,57 +146,131 @@ public:
   // Optimized 1D access
   template <typename Index>
   inline T& operator()(Index i0) {
+#ifdef CNDA_BOUNDS_CHECK
+      if (m_ndim != 1) throw std::out_of_range("operator(): rank mismatch");
+      std::size_t idx = static_cast<std::size_t>(i0);
+      if (idx >= m_shape[0]) throw std::out_of_range("operator(): index out of bounds");
+      return m_data[idx * m_strides[0]];
+#else
       return m_data[static_cast<std::size_t>(i0) * m_strides[0]];
+#endif
   }
   
   template <typename Index>
   inline const T& operator()(Index i0) const {
+#ifdef CNDA_BOUNDS_CHECK
+      if (m_ndim != 1) throw std::out_of_range("operator(): rank mismatch");
+      std::size_t idx = static_cast<std::size_t>(i0);
+      if (idx >= m_shape[0]) throw std::out_of_range("operator(): index out of bounds");
+      return m_data[idx * m_strides[0]];
+#else
       return m_data[static_cast<std::size_t>(i0) * m_strides[0]];
+#endif
   }
   
   // Optimized 2D access
   template <typename Index1, typename Index2>
   inline T& operator()(Index1 i0, Index2 i1) {
+#ifdef CNDA_BOUNDS_CHECK
+      if (m_ndim != 2) throw std::out_of_range("operator(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1]) 
+          throw std::out_of_range("operator(): index out of bounds");
+      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1]];
+#else
       return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
                     static_cast<std::size_t>(i1) * m_strides[1]];
+#endif
   }
   
   template <typename Index1, typename Index2>
   inline const T& operator()(Index1 i0, Index2 i1) const {
+#ifdef CNDA_BOUNDS_CHECK
+      if (m_ndim != 2) throw std::out_of_range("operator(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1]) 
+          throw std::out_of_range("operator(): index out of bounds");
+      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1]];
+#else
       return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
                     static_cast<std::size_t>(i1) * m_strides[1]];
+#endif
   }
   
   // Optimized 3D access
   template <typename Index1, typename Index2, typename Index3>
   inline T& operator()(Index1 i0, Index2 i1, Index3 i2) {
+#ifdef CNDA_BOUNDS_CHECK
+      if (m_ndim != 3) throw std::out_of_range("operator(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      std::size_t idx2 = static_cast<std::size_t>(i2);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2]) 
+          throw std::out_of_range("operator(): index out of bounds");
+      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1] + idx2 * m_strides[2]];
+#else
       return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
                     static_cast<std::size_t>(i1) * m_strides[1] +
                     static_cast<std::size_t>(i2) * m_strides[2]];
+#endif
   }
   
   template <typename Index1, typename Index2, typename Index3>
   inline const T& operator()(Index1 i0, Index2 i1, Index3 i2) const {
+#ifdef CNDA_BOUNDS_CHECK
+      if (m_ndim != 3) throw std::out_of_range("operator(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      std::size_t idx2 = static_cast<std::size_t>(i2);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2]) 
+          throw std::out_of_range("operator(): index out of bounds");
+      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1] + idx2 * m_strides[2]];
+#else
       return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
                     static_cast<std::size_t>(i1) * m_strides[1] +
                     static_cast<std::size_t>(i2) * m_strides[2]];
+#endif
   }
   
   // Optimized 4D access
   template <typename Index1, typename Index2, typename Index3, typename Index4>
   inline T& operator()(Index1 i0, Index2 i1, Index3 i2, Index4 i3) {
+#ifdef CNDA_BOUNDS_CHECK
+      if (m_ndim != 4) throw std::out_of_range("operator(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      std::size_t idx2 = static_cast<std::size_t>(i2);
+      std::size_t idx3 = static_cast<std::size_t>(i3);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2] || idx3 >= m_shape[3]) 
+          throw std::out_of_range("operator(): index out of bounds");
+      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1] + idx2 * m_strides[2] + idx3 * m_strides[3]];
+#else
       return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
                     static_cast<std::size_t>(i1) * m_strides[1] +
                     static_cast<std::size_t>(i2) * m_strides[2] +
                     static_cast<std::size_t>(i3) * m_strides[3]];
+#endif
   }
   
   template <typename Index1, typename Index2, typename Index3, typename Index4>
   inline const T& operator()(Index1 i0, Index2 i1, Index3 i2, Index4 i3) const {
+#ifdef CNDA_BOUNDS_CHECK
+      if (m_ndim != 4) throw std::out_of_range("operator(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      std::size_t idx2 = static_cast<std::size_t>(i2);
+      std::size_t idx3 = static_cast<std::size_t>(i3);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2] || idx3 >= m_shape[3]) 
+          throw std::out_of_range("operator(): index out of bounds");
+      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1] + idx2 * m_strides[2] + idx3 * m_strides[3]];
+#else
       return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
                     static_cast<std::size_t>(i1) * m_strides[1] +
                     static_cast<std::size_t>(i2) * m_strides[2] +
                     static_cast<std::size_t>(i3) * m_strides[3]];
+#endif
   }
 
   // General N-D fallback for 5+ dimensions
@@ -206,7 +280,11 @@ public:
       constexpr std::size_t N = sizeof...(Indices);
       std::array<std::size_t, N> idx_array
           {{ static_cast<std::size_t>(indices)... }};
+#ifdef CNDA_BOUNDS_CHECK
+      return m_data[ compute_offset(idx_array.data(), N, true) ];
+#else
       return m_data[ compute_offset(idx_array.data(), N, false) ];
+#endif
   }
 
   template <typename... Indices,
@@ -215,7 +293,11 @@ public:
       constexpr std::size_t N = sizeof...(Indices);
       std::array<std::size_t, N> idx_array
           {{ static_cast<std::size_t>(indices)... }};
+#ifdef CNDA_BOUNDS_CHECK
+      return m_data[ compute_offset(idx_array.data(), N, true) ];
+#else
       return m_data[ compute_offset(idx_array.data(), N, false) ];
+#endif
   }
 
 private:
