@@ -14,9 +14,9 @@ namespace cnda {
 template <class T>
 class ContiguousND {
   // AoS safety checks: T must be POD-like
-  static_assert(std::is_standard_layout_v<T>,
+  static_assert(std::is_standard_layout<T>::value,
                 "ContiguousND requires T to be standard-layout type");
-  static_assert(std::is_trivially_copyable_v<T>,
+  static_assert(std::is_trivially_copyable<T>::value,
                 "ContiguousND requires T to be trivially copyable");
   
 public:
@@ -201,7 +201,7 @@ public:
 
   // General N-D fallback for 5+ dimensions
   template <typename... Indices, 
-            typename = std::enable_if_t<(sizeof...(Indices) >= 5)>>
+            typename = typename std::enable_if<(sizeof...(Indices) >= 5)>::type>
   T& operator()(Indices... indices) {
       constexpr std::size_t N = sizeof...(Indices);
       std::array<std::size_t, N> idx_array
@@ -210,7 +210,7 @@ public:
   }
 
   template <typename... Indices,
-            typename = std::enable_if_t<(sizeof...(Indices) >= 5)>>
+            typename = typename std::enable_if<(sizeof...(Indices) >= 5)>::type>
   const T& operator()(Indices... indices) const {
       constexpr std::size_t N = sizeof...(Indices);
       std::array<std::size_t, N> idx_array
