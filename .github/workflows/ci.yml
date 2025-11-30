@@ -44,14 +44,13 @@ jobs:
         run: ctest --test-dir build --output-on-failure --build-config ${{ matrix.build_type }}
 
   build-test-setuppy:
-    name: ${{ matrix.os }} / Python ${{ matrix.python-version }} / setup.py${{ matrix.bounds_check && ' + BOUNDS_CHECK' || '' }}
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }} / setup.py
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14' ]
-        bounds_check: [ false, true ]
 
     steps:
       - name: Checkout
@@ -69,10 +68,8 @@ jobs:
 
       - name: Build and Install via setup.py
         run: |
-          pip install -v ${{ matrix.bounds_check && '--force-reinstall --no-cache-dir' || '' }} .
-        env:
-          CNDA_BOUNDS_CHECK: ${{ matrix.bounds_check && '1' || '0' }}
+          pip install -v .
 
       - name: Test Python Bindings (setup.py build)
         run: |
-          pytest tests/ -v ${{ matrix.bounds_check && '' || '-m "not bounds_check_required"' }}
+          pytest tests/ -v

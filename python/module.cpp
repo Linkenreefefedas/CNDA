@@ -2,76 +2,13 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include <cnda/contiguous_nd.hpp>
+#include <cnda/aos_types.hpp>
+#include "utils.hpp"
+#include "aos_types.hpp"
 #include <cstdint>
 #include <string>
-#include <cstring>
 
 namespace py = pybind11;
-
-// Helper function to implement from_numpy logic (used by both dtype-specific and generic functions)
-template<typename T>
-cnda::ContiguousND<T> from_numpy_impl(const py::array_t<T>& arr, bool copy) {
-    
-    // Extract shape
-    std::vector<std::size_t> shape;
-    shape.reserve(static_cast<std::size_t>(arr.ndim()));
-    for (py::ssize_t i = 0; i < arr.ndim(); ++i) {
-        shape.push_back(static_cast<std::size_t>(arr.shape(i)));
-    }
-
-    // deep copy
-    if (copy) {
-        py::array_t<T, py::array::c_style | py::array::forcecast> arr_c(arr);
-        cnda::ContiguousND<T> result(shape);
-
-        const T* src = arr_c.data();
-        T* dst = result.data();
-
-        std::memcpy(dst, src, result.size() * sizeof(T));
-        return result;
-    }
-
-    // zero-copy
-    // Check if array is C-contiguous
-    if (!(arr.flags() & py::array::c_style)) {
-        // ValueError for shape/layout mismatch
-        PyErr_SetString(PyExc_ValueError,
-            "from_numpy with copy=False requires C-contiguous (row-major) array. "
-            "Use copy=True to force a copy, or ensure the input array is C-contiguous.");
-        throw py::error_already_set();
-    }
-
-    // Additional stride validation for safety
-    cnda::ContiguousND<T> tmp(shape);
-    const auto& expected = tmp.strides();
-    for (py::ssize_t i = 0; i < arr.ndim(); ++i) {
-        auto stride_elems = arr.strides(i) / static_cast<py::ssize_t>(sizeof(T));
-        if (stride_elems != static_cast<py::ssize_t>(expected[static_cast<std::size_t>(i)])) {
-            // ValueError for shape/layout mismatch
-            PyErr_SetString(PyExc_ValueError,
-                "from_numpy(copy=False) requires standard row-major strides. "
-                "The input has non-standard strides; use copy=True.");
-            throw py::error_already_set();
-        }
-    }
-
-    T* data_ptr = const_cast<T*>(arr.data());  // Need mutable access for zero-copy view
-
-    struct NumpyOwner {
-        py::array arr;
-        explicit NumpyOwner(py::array a) : arr(std::move(a)) {}
-    };
-
-    // Use shared_ptr constructor with custom deleter for better exception safety
-    std::shared_ptr<void> owner(
-        new NumpyOwner(py::array(arr)),  // Explicitly copy py::array to extend lifetime
-        [](void* p) {
-            delete static_cast<NumpyOwner*>(p);
-        }
-    );
-
-    return cnda::ContiguousND<T>(std::move(shape), data_ptr, std::move(owner));
-}
 
 // Helper function to bind a specific dtype variant
 template<typename T>
@@ -80,8 +17,17 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
     
     std::string class_name = "ContiguousND_" + dtype_suffix;
     
-    py::class_<ContiguousND_T>(m, class_name.c_str())
-        .def(py::init<std::vector<std::size_t>>(),
+    auto cls = py::class_<ContiguousND_T>(m, class_name.c_str());
+    
+    cls
+        .def(py::init([](std::vector<std::size_t> shape) {
+            // Validate shape
+            if (shape.empty()) {
+                throw std::invalid_argument("Shape cannot be empty");
+            }
+            // Allow zero-sized dimensions (e.g., shape=[0, 7])
+            return ContiguousND_T(shape);
+        }),
              py::arg("shape"),
              "Construct a ContiguousND array with the given shape")
         
@@ -121,159 +67,66 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
         .def("__call__",
             [](ContiguousND_T &self, py::args indices) -> T& {
                 std::vector<std::size_t> idx_vec;
+                idx_vec.reserve(indices.size());
                 for (auto idx : indices) {
                     idx_vec.push_back(idx.cast<std::size_t>());
                 }
-                
-                #ifdef CNDA_BOUNDS_CHECK
-                if (idx_vec.size() != self.ndim()) {
-                    throw std::out_of_range("Number of indices does not match ndim");
-                }
-                #endif
-                
-                // Compute offset using strides
-                std::size_t offset = 0;
-                const auto& shape = self.shape();
-                const auto& strides = self.strides();
-                
-                for (size_t i = 0; i < idx_vec.size(); ++i) {
-                    #ifdef CNDA_BOUNDS_CHECK
-                    if (idx_vec[i] >= shape[i]) {
-                        throw std::out_of_range("Index out of bounds");
-                    }
-                    #endif
-                    offset += idx_vec[i] * strides[i];
-                }
-                
+
+                std::size_t offset = compute_offset(self, idx_vec);
                 return self.data()[offset];
             },
             py::return_value_policy::reference_internal,
             "Access element at given indices")
         
+        
         // Also support __getitem__ with tuple for more Pythonic access
         .def("__getitem__",
             [](const ContiguousND_T &self, std::size_t index) -> T {
-                #ifdef CNDA_BOUNDS_CHECK
-                // Single index access for 1D arrays
                 if (self.ndim() != 1) {
                     throw std::out_of_range("Single index only valid for 1D arrays");
                 }
-                
-                const auto& shape = self.shape();
-                if (index >= shape[0]) {
-                    throw std::out_of_range("Index out of bounds");
-                }
-                #endif
-                
-                return self.data()[index];
+                std::vector<std::size_t> idx_vec{index};
+                std::size_t offset = compute_offset(self, idx_vec);
+                return self.data()[offset];
             },
             "Get element at given index (1D arrays)")
         
+        
         .def("__getitem__",
             [](const ContiguousND_T &self, py::tuple indices) -> T {
-                std::vector<std::size_t> idx_vec;
-                for (auto idx : indices) {
-                    idx_vec.push_back(idx.cast<std::size_t>());
-                }
-                
-                #ifdef CNDA_BOUNDS_CHECK
-                if (idx_vec.size() != self.ndim()) {
-                    throw std::out_of_range("Number of indices does not match ndim");
-                }
-                #endif
-                
-                // Compute offset using strides
-                std::size_t offset = 0;
-                const auto& shape = self.shape();
-                const auto& strides = self.strides();
-                
-                for (size_t i = 0; i < idx_vec.size(); ++i) {
-                    #ifdef CNDA_BOUNDS_CHECK
-                    if (idx_vec[i] >= shape[i]) {
-                        throw std::out_of_range("Index out of bounds");
-                    }
-                    #endif
-                    offset += idx_vec[i] * strides[i];
-                }
-                
+                auto idx_vec = tuple_to_indices(indices);
+                std::size_t offset = compute_offset(self, idx_vec);
                 return self.data()[offset];
             },
             "Get element at given indices")
         
         .def("__setitem__",
             [](ContiguousND_T &self, std::size_t index, T value) {
-                #ifdef CNDA_BOUNDS_CHECK
-                // Single index access for 1D arrays
                 if (self.ndim() != 1) {
                     throw std::out_of_range("Single index only valid for 1D arrays");
                 }
-                
-                const auto& shape = self.shape();
-                if (index >= shape[0]) {
-                    throw std::out_of_range("Index out of bounds");
-                }
-                #endif
-                
-                self.data()[index] = value;
+                std::vector<std::size_t> idx_vec{index};
+                std::size_t offset = compute_offset(self, idx_vec);
+                self.data()[offset] = value;
             },
             "Set element at given index (1D arrays)")
         
         .def("__setitem__",
             [](ContiguousND_T &self, py::tuple indices, T value) {
-                std::vector<std::size_t> idx_vec;
-                for (auto idx : indices) {
-                    idx_vec.push_back(idx.cast<std::size_t>());
-                }
-                
-                #ifdef CNDA_BOUNDS_CHECK
-                if (idx_vec.size() != self.ndim()) {
-                    throw std::out_of_range("Number of indices does not match ndim");
-                }
-                #endif
-                
-                // Compute offset using strides
-                std::size_t offset = 0;
-                const auto& shape = self.shape();
-                const auto& strides = self.strides();
-                
-                for (size_t i = 0; i < idx_vec.size(); ++i) {
-                    #ifdef CNDA_BOUNDS_CHECK
-                    if (idx_vec[i] >= shape[i]) {
-                        throw std::out_of_range("Index out of bounds");
-                    }
-                    #endif
-                    offset += idx_vec[i] * strides[i];
-                }
-                
+                auto idx_vec = tuple_to_indices(indices);
+                std::size_t offset = compute_offset(self, idx_vec);
                 self.data()[offset] = value;
             },
             "Set element at given indices")
 
         .def("at",
             [](const ContiguousND_T &self, py::tuple indices) -> T {
-                std::vector<std::size_t> idx_vec;
-                for (auto idx : indices) {
-                    idx_vec.push_back(idx.cast<std::size_t>());
-                }
-                // pybind11 can't automatically convert py::tuple to std::initializer_list,
-                // so we convert to std::vector first and then call a helper.
-                // To avoid creating a new C++ helper, we can just call the existing `at`
-                // by creating an initializer list, but that's complicated.
-                // The simplest is to just re-implement the logic here, which is what is done for other methods.
-                if (idx_vec.size() != self.ndim()) {
-                    throw std::out_of_range("at(): rank mismatch");
-                }
-                std::size_t offset = 0;
-                const auto& shape = self.shape();
-                const auto& strides = self.strides();
-                for (size_t i = 0; i < idx_vec.size(); ++i) {
-                    if (idx_vec[i] >= shape[i]) {
-                        throw std::out_of_range("at(): index out of bounds");
-                    }
-                    offset += idx_vec[i] * strides[i];
-                }
+                std::vector<std::size_t> idx_vec = tuple_to_indices(indices);
+                // Call C++ compute_offset with bounds checking always enabled for at()
+                std::size_t offset = self.compute_offset(idx_vec.data(), idx_vec.size(), true);
                 return self.data()[offset];
-            }, "Safe access with bounds checking")
+            },
+            "Safe access with bounds checking")
         
         // String representation
         .def("__repr__",
@@ -381,7 +234,10 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
                 True
             )pbdoc");
     
-    // Add static from_numpy function
+    // Bind AoS-specific field accessors if applicable
+    cnda::aos_bindings::bind_aos_fields<T>(cls);
+    
+    // Add static from_numpy function (generic version, no dtype validation)
     m.def(("from_numpy_" + dtype_suffix).c_str(),
         [](py::array_t<T> arr, bool copy) -> ContiguousND_T {
             return from_numpy_impl<T>(arr, copy);
@@ -435,6 +291,12 @@ void bind_contiguous_nd(py::module_ &m, const std::string &dtype_suffix) {
 PYBIND11_MODULE(cnda, m) {
     m.doc() = "CNDA: Contiguous N-Dimensional Array library with zero-copy NumPy interoperability";
     
+    // Register NumPy structured dtypes for AoS types
+    cnda::aos_bindings::register_numpy_dtypes();
+    
+    // Register built-in AoS types in the type registry
+    cnda::aos_bindings::register_builtin_aos_types();
+    
     // Register exception translators for proper Python error types
     // std::out_of_range -> IndexError (out-of-bounds access)
     py::register_exception_translator([](std::exception_ptr p) {
@@ -476,11 +338,23 @@ PYBIND11_MODULE(cnda, m) {
     m.attr("__version__") = "0.1.0";
 #endif
     
-    // Bind all dtype variants with distinct names
+    // ========================================================================
+    // Bind Primitive Types
+    // ========================================================================
+    // These are basic numeric types with no special validation needed
+    
     bind_contiguous_nd<float>(m, "f32");
     bind_contiguous_nd<double>(m, "f64");
     bind_contiguous_nd<std::int32_t>(m, "i32");
     bind_contiguous_nd<std::int64_t>(m, "i64");
+    
+    // ========================================================================
+    // Bind Array-of-Structures (AoS) Types
+    // ========================================================================
+    // All AoS-related bindings are in aos_types.cpp
+    // This includes type registration and validated from_numpy functions
+    
+    cnda::aos_bindings::register_aos_bindings(m);
     
     // Add convenience type aliases for easier documentation
     m.attr("ContiguousND_float") = m.attr("ContiguousND_f32");
@@ -552,3 +426,11 @@ PYBIND11_MODULE(cnda, m) {
         )pbdoc"
     );
 }
+
+// Explicit template instantiations for AoS types used in aos_types.cpp
+template void bind_contiguous_nd<cnda::aos::Vec2f>(py::module_&, const std::string&);
+template void bind_contiguous_nd<cnda::aos::Vec3f>(py::module_&, const std::string&);
+template void bind_contiguous_nd<cnda::aos::Cell2D>(py::module_&, const std::string&);
+template void bind_contiguous_nd<cnda::aos::Cell3D>(py::module_&, const std::string&);
+template void bind_contiguous_nd<cnda::aos::Particle>(py::module_&, const std::string&);
+template void bind_contiguous_nd<cnda::aos::MaterialPoint>(py::module_&, const std::string&);
