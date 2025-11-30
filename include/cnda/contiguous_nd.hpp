@@ -99,23 +99,24 @@ public:
 
   // -------- Core offset computation (shared by all accessors) --------
   std::size_t compute_offset(const std::size_t* idx_array, std::size_t n, bool check_bounds) const {
-      if (check_bounds && n != m_ndim) {
+      bool enforce_bounds = check_bounds;
+#ifdef CNDA_BOUNDS_CHECK
+      enforce_bounds = true;
+#endif
+
+      if (enforce_bounds && n != m_ndim) {
           throw std::out_of_range("at(): rank mismatch");
       }
 #ifndef CNDA_BOUNDS_CHECK
       // When bounds check is disabled and not forced, clamp to safe range
-      if (!check_bounds && n != m_ndim) {
+      if (!enforce_bounds && n != m_ndim) {
           n = std::min(n, m_ndim);
       }
 #endif
 
       std::size_t off = 0;
       for (std::size_t i = 0; i < n; ++i) {
-          bool bounds_check_needed = check_bounds;
-#ifdef CNDA_BOUNDS_CHECK
-          bounds_check_needed = true;
-#endif
-          if (bounds_check_needed && idx_array[i] >= m_shape[i]) {
+          if (enforce_bounds && idx_array[i] >= m_shape[i]) {
               throw std::out_of_range("at(): index out of bounds");
           }
           off += idx_array[i] * m_strides[i];  // stride in ELEMENTS
@@ -125,13 +126,8 @@ public:
 
   // -------- initializer_list version --------
   std::size_t index(std::initializer_list<std::size_t> idxs, bool check_bounds = false) const {
-      std::array<std::size_t, 32> tmp{}; // Max ndim=32 (safe default)
-      if (idxs.size() > tmp.size()) {
-          throw std::runtime_error("Too many dimensions (limit=32)");
-      }
-      std::size_t axis = 0;
-      for (auto v : idxs) tmp[axis++] = v;
-      return compute_offset(tmp.data(), idxs.size(), check_bounds);
+      std::vector<std::size_t> tmp(idxs.begin(), idxs.end());
+      return compute_offset(tmp.data(), tmp.size(), check_bounds);
   }
 
   // -------- at() with bounds guaranteed --------
@@ -142,7 +138,7 @@ public:
       return m_data[index(idxs, true)];
   }
 
-  // -------- Variadic operator() (no VLA!) --------
+  // -------- Variadic operator() --------
   // Optimized 1D access
   template <typename Index>
   inline T& operator()(Index i0) {
