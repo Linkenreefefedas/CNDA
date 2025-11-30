@@ -138,8 +138,8 @@ inline void validate_aos_dtype(const py::dtype& dtype,
         auto field_dtype = field_info[py::int_(0)].cast<py::dtype>();
         
         if (!field_dtype.is(expected_fields[i].dtype)) {
-            std::string expected_type_str = py::str(expected_fields[i].dtype).cast<std::string>();
-            std::string actual_type_str = py::str(field_dtype).cast<std::string>();
+            std::string expected_type_str = py::str(py::object(expected_fields[i].dtype)).cast<std::string>();
+            std::string actual_type_str = py::str(py::object(field_dtype)).cast<std::string>();
             
             std::string msg = type_name + "." + actual_name + " requires " + expected_type_str +
                             ", got " + actual_type_str;
