@@ -42,12 +42,10 @@ class CMakeBuild(build_ext):
             f'-DCNDA_PYTHON_OUTPUT_DIR={extdir}',
             f'-DPYTHON_EXECUTABLE={sys.executable}',
             '-DBUILD_TESTING=OFF',
+            '-DBUILD_BENCHMARKS=OFF',
             f'-Dpybind11_DIR={pybind11_dir}',
+            '-DCNDA_BOUNDS_CHECK=ON',  # Python bindings always perform bounds checking
         ]
-
-        # Support CNDA_BOUNDS_CHECK via environment variable
-        if os.environ.get('CNDA_BOUNDS_CHECK', '').lower() in ('1', 'on', 'true', 'yes'):
-            cmake_args.append('-DCNDA_BOUNDS_CHECK=ON')
 
         cfg = 'Debug' if self.debug else 'Release'
         build_args = ['--config', cfg]
