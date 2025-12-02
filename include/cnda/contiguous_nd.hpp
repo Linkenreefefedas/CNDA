@@ -131,6 +131,101 @@ public:
   }
 
   // -------- at() with bounds guaranteed --------
+  // Optimized variadic at() - always checks bounds, avoids dynamic allocation
+  
+  // 1D at()
+  template <typename Index>
+  inline T& at(Index i0) {
+      if (m_ndim != 1) throw std::out_of_range("at(): rank mismatch");
+      std::size_t idx = static_cast<std::size_t>(i0);
+      if (idx >= m_shape[0]) throw std::out_of_range("at(): index out of bounds");
+      return m_data[idx * m_strides[0]];
+  }
+  
+  template <typename Index>
+  inline const T& at(Index i0) const {
+      if (m_ndim != 1) throw std::out_of_range("at(): rank mismatch");
+      std::size_t idx = static_cast<std::size_t>(i0);
+      if (idx >= m_shape[0]) throw std::out_of_range("at(): index out of bounds");
+      return m_data[idx * m_strides[0]];
+  }
+
+  // 2D at()
+  template <typename Index1, typename Index2>
+  inline T& at(Index1 i0, Index2 i1) {
+      if (m_ndim != 2) throw std::out_of_range("at(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1]) 
+          throw std::out_of_range("at(): index out of bounds");
+      return m_data[idx0 * m_shape[1] + idx1];
+  }
+  
+  template <typename Index1, typename Index2>
+  inline const T& at(Index1 i0, Index2 i1) const {
+      if (m_ndim != 2) throw std::out_of_range("at(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1]) 
+          throw std::out_of_range("at(): index out of bounds");
+      return m_data[idx0 * m_shape[1] + idx1];
+  }
+
+  // 3D at()
+  template <typename Index1, typename Index2, typename Index3>
+  inline T& at(Index1 i0, Index2 i1, Index3 i2) {
+      if (m_ndim != 3) throw std::out_of_range("at(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      std::size_t idx2 = static_cast<std::size_t>(i2);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2]) 
+          throw std::out_of_range("at(): index out of bounds");
+      const std::size_t dim2 = m_shape[2];
+      return m_data[idx0 * (m_shape[1] * dim2) + idx1 * dim2 + idx2];
+  }
+  
+  template <typename Index1, typename Index2, typename Index3>
+  inline const T& at(Index1 i0, Index2 i1, Index3 i2) const {
+      if (m_ndim != 3) throw std::out_of_range("at(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      std::size_t idx2 = static_cast<std::size_t>(i2);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2]) 
+          throw std::out_of_range("at(): index out of bounds");
+      const std::size_t dim2 = m_shape[2];
+      return m_data[idx0 * (m_shape[1] * dim2) + idx1 * dim2 + idx2];
+  }
+
+  // 4D at()
+  template <typename Index1, typename Index2, typename Index3, typename Index4>
+  inline T& at(Index1 i0, Index2 i1, Index3 i2, Index4 i3) {
+      if (m_ndim != 4) throw std::out_of_range("at(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      std::size_t idx2 = static_cast<std::size_t>(i2);
+      std::size_t idx3 = static_cast<std::size_t>(i3);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2] || idx3 >= m_shape[3]) 
+          throw std::out_of_range("at(): index out of bounds");
+      const std::size_t dim2 = m_shape[2];
+      const std::size_t dim3 = m_shape[3];
+      return m_data[idx0 * (m_shape[1] * dim2 * dim3) + idx1 * (dim2 * dim3) + idx2 * dim3 + idx3];
+  }
+  
+  template <typename Index1, typename Index2, typename Index3, typename Index4>
+  inline const T& at(Index1 i0, Index2 i1, Index3 i2, Index4 i3) const {
+      if (m_ndim != 4) throw std::out_of_range("at(): rank mismatch");
+      std::size_t idx0 = static_cast<std::size_t>(i0);
+      std::size_t idx1 = static_cast<std::size_t>(i1);
+      std::size_t idx2 = static_cast<std::size_t>(i2);
+      std::size_t idx3 = static_cast<std::size_t>(i3);
+      if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2] || idx3 >= m_shape[3]) 
+          throw std::out_of_range("at(): index out of bounds");
+      const std::size_t dim2 = m_shape[2];
+      const std::size_t dim3 = m_shape[3];
+      return m_data[idx0 * (m_shape[1] * dim2 * dim3) + idx1 * (dim2 * dim3) + idx2 * dim3 + idx3];
+  }
+
+  // Legacy initializer_list at() for backward compatibility
   T& at(std::initializer_list<std::size_t> idxs) {
       return m_data[index(idxs, true)];
   }
@@ -173,10 +268,11 @@ public:
       std::size_t idx1 = static_cast<std::size_t>(i1);
       if (idx0 >= m_shape[0] || idx1 >= m_shape[1]) 
           throw std::out_of_range("operator(): index out of bounds");
-      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1]];
+      return m_data[idx0 * m_shape[1] + idx1];
 #else
-      return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
-                    static_cast<std::size_t>(i1) * m_strides[1]];
+      // Optimized: For row-major 2D, stride[0]=shape[1], stride[1]=1
+      return m_data[static_cast<std::size_t>(i0) * m_shape[1] + 
+                    static_cast<std::size_t>(i1)];
 #endif
   }
   
@@ -188,10 +284,11 @@ public:
       std::size_t idx1 = static_cast<std::size_t>(i1);
       if (idx0 >= m_shape[0] || idx1 >= m_shape[1]) 
           throw std::out_of_range("operator(): index out of bounds");
-      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1]];
+      return m_data[idx0 * m_shape[1] + idx1];
 #else
-      return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
-                    static_cast<std::size_t>(i1) * m_strides[1]];
+      // Optimized: For row-major 2D, stride[0]=shape[1], stride[1]=1
+      return m_data[static_cast<std::size_t>(i0) * m_shape[1] + 
+                    static_cast<std::size_t>(i1)];
 #endif
   }
   
@@ -205,11 +302,14 @@ public:
       std::size_t idx2 = static_cast<std::size_t>(i2);
       if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2]) 
           throw std::out_of_range("operator(): index out of bounds");
-      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1] + idx2 * m_strides[2]];
+      const std::size_t dim2 = m_shape[2];
+      return m_data[idx0 * (m_shape[1] * dim2) + idx1 * dim2 + idx2];
 #else
-      return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
-                    static_cast<std::size_t>(i1) * m_strides[1] +
-                    static_cast<std::size_t>(i2) * m_strides[2]];
+      // Optimized: For row-major 3D, stride[0]=shape[1]*shape[2], stride[1]=shape[2], stride[2]=1
+      const std::size_t dim2 = m_shape[2];
+      return m_data[static_cast<std::size_t>(i0) * (m_shape[1] * dim2) + 
+                    static_cast<std::size_t>(i1) * dim2 +
+                    static_cast<std::size_t>(i2)];
 #endif
   }
   
@@ -222,11 +322,14 @@ public:
       std::size_t idx2 = static_cast<std::size_t>(i2);
       if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2]) 
           throw std::out_of_range("operator(): index out of bounds");
-      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1] + idx2 * m_strides[2]];
+      const std::size_t dim2 = m_shape[2];
+      return m_data[idx0 * (m_shape[1] * dim2) + idx1 * dim2 + idx2];
 #else
-      return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
-                    static_cast<std::size_t>(i1) * m_strides[1] +
-                    static_cast<std::size_t>(i2) * m_strides[2]];
+      // Optimized: For row-major 3D, stride[0]=shape[1]*shape[2], stride[1]=shape[2], stride[2]=1
+      const std::size_t dim2 = m_shape[2];
+      return m_data[static_cast<std::size_t>(i0) * (m_shape[1] * dim2) + 
+                    static_cast<std::size_t>(i1) * dim2 +
+                    static_cast<std::size_t>(i2)];
 #endif
   }
   
@@ -241,12 +344,17 @@ public:
       std::size_t idx3 = static_cast<std::size_t>(i3);
       if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2] || idx3 >= m_shape[3]) 
           throw std::out_of_range("operator(): index out of bounds");
-      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1] + idx2 * m_strides[2] + idx3 * m_strides[3]];
+      const std::size_t dim2 = m_shape[2];
+      const std::size_t dim3 = m_shape[3];
+      return m_data[idx0 * (m_shape[1] * dim2 * dim3) + idx1 * (dim2 * dim3) + idx2 * dim3 + idx3];
 #else
-      return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
-                    static_cast<std::size_t>(i1) * m_strides[1] +
-                    static_cast<std::size_t>(i2) * m_strides[2] +
-                    static_cast<std::size_t>(i3) * m_strides[3]];
+      // Optimized: Direct calculation eliminates strides array access
+      const std::size_t dim2 = m_shape[2];
+      const std::size_t dim3 = m_shape[3];
+      return m_data[static_cast<std::size_t>(i0) * (m_shape[1] * dim2 * dim3) + 
+                    static_cast<std::size_t>(i1) * (dim2 * dim3) +
+                    static_cast<std::size_t>(i2) * dim3 +
+                    static_cast<std::size_t>(i3)];
 #endif
   }
   
@@ -260,12 +368,17 @@ public:
       std::size_t idx3 = static_cast<std::size_t>(i3);
       if (idx0 >= m_shape[0] || idx1 >= m_shape[1] || idx2 >= m_shape[2] || idx3 >= m_shape[3]) 
           throw std::out_of_range("operator(): index out of bounds");
-      return m_data[idx0 * m_strides[0] + idx1 * m_strides[1] + idx2 * m_strides[2] + idx3 * m_strides[3]];
+      const std::size_t dim2 = m_shape[2];
+      const std::size_t dim3 = m_shape[3];
+      return m_data[idx0 * (m_shape[1] * dim2 * dim3) + idx1 * (dim2 * dim3) + idx2 * dim3 + idx3];
 #else
-      return m_data[static_cast<std::size_t>(i0) * m_strides[0] + 
-                    static_cast<std::size_t>(i1) * m_strides[1] +
-                    static_cast<std::size_t>(i2) * m_strides[2] +
-                    static_cast<std::size_t>(i3) * m_strides[3]];
+      // Optimized: Direct calculation eliminates strides array access
+      const std::size_t dim2 = m_shape[2];
+      const std::size_t dim3 = m_shape[3];
+      return m_data[static_cast<std::size_t>(i0) * (m_shape[1] * dim2 * dim3) + 
+                    static_cast<std::size_t>(i1) * (dim2 * dim3) +
+                    static_cast<std::size_t>(i2) * dim3 +
+                    static_cast<std::size_t>(i3)];
 #endif
   }
 

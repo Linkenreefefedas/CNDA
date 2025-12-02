@@ -11,40 +11,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <cnda/contiguous_nd.hpp>
+#include <cnda/aos_types.hpp>
 
 using namespace cnda;
-
-// ============================================================================
-// AoS Type Definitions
-// ============================================================================
-
-// Small struct: 8 bytes
-struct Vec2f {
-    float x, y;
-};
-
-// Medium struct: 12 bytes (fluid simulation cell)
-struct Cell2D {
-    float u, v;  // velocity components
-    int state;
-};
-
-// Medium struct: 12 bytes (3D vector)
-struct Vec3f {
-    float x, y, z;
-};
-
-// Large struct: 56 bytes (fits in one cache line)
-struct Particle {
-    float x, y, z;          // Position (12 bytes)
-    float vx, vy, vz;       // Velocity (12 bytes)
-    float mass;             // Mass (4 bytes)
-    float charge;           // Charge (4 bytes)
-    int id;                 // ID (4 bytes)
-    int type;               // Type (4 bytes)
-    float lifetime;         // Lifetime (4 bytes)
-    float padding[3];       // Padding to 56 bytes
-};
+using namespace cnda::aos;
 
 // ============================================================================
 // Small Struct: Vec2f (8 bytes)
@@ -98,7 +68,7 @@ TEST_CASE("Cell2D fluid simulation", "[benchmark][aos][cell2d]") {
     // Initialize velocity field
     for (size_t i = 0; i < N; ++i) {
         for (size_t j = 0; j < N; ++j) {
-            grid(i, j) = {1.0f, 0.5f, 1};
+            grid(i, j) = {1.0f, 0.5f, 1};  // u, v, flag
         }
     }
     
@@ -130,16 +100,11 @@ TEST_CASE("Particle system", "[benchmark][aos][particle]") {
     // Initialize
     for (size_t i = 0; i < N; ++i) {
         particles(i) = {
-            static_cast<float>(i % 100),      // x
-            static_cast<float>(i / 100),      // y
-            0.0f,                             // z
-            1.0f, 1.0f, 0.0f,                // vx, vy, vz
-            1.0f,                             // mass
-            0.0f,                             // charge
-            static_cast<int>(i),              // id
-            0,                                // type
-            100.0f,                           // lifetime
-            {0.0f, 0.0f, 0.0f}               // padding
+            static_cast<double>(i % 100),     // x
+            static_cast<double>(i / 100),     // y
+            0.0,                              // z
+            1.0, 1.0, 0.0,                   // vx, vy, vz
+            1.0                               // mass
         };
     }
     
