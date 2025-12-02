@@ -1,0 +1,32 @@
+#!/bin/bash
+# Auto-generated benchmark runner script
+
+echo "======================================"
+echo "CNDA Performance Benchmarks"
+echo "======================================"
+echo ""
+
+BUILD_DIR="@CMAKE_BINARY_DIR@"
+PYTHON_EXE="@Python_EXECUTABLE@"
+
+# C++ Benchmarks
+echo "Running C++ Core Benchmarks..."
+"$BUILD_DIR/benchmarks/bench_core" --benchmark-samples 100
+echo ""
+
+echo "Running C++ AoS Benchmarks..."
+"$BUILD_DIR/benchmarks/bench_aos" --benchmark-samples 100
+echo ""
+
+# Python Benchmarks
+if [ -x "$PYTHON_EXE" ]; then
+    echo "Running Python NumPy Interop Benchmarks..."
+    PYTHONPATH="$BUILD_DIR/python" "$PYTHON_EXE" -m pytest \
+        "@CMAKE_CURRENT_SOURCE_DIR@/bench_numpy_interop.py" \
+        -v --benchmark-only --benchmark-group-by=group
+    echo ""
+fi
+
+echo "======================================"
+echo "Benchmarks Complete!"
+echo "======================================"
