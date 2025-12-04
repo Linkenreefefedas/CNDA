@@ -242,8 +242,6 @@ Python API (module ``cnda``)
   # If you need isolation from the C++ owner:
   B_copy = b.to_numpy(copy=True)       # explicit copy with independent lifetime
 
-**For more details, see:** `docs/PYTHON_BINDINGS.md <docs/PYTHON_BINDINGS.md>`_
-
 Zero-copy and error semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``from_numpy(arr, copy=False)`` is zero-copy only if:
@@ -282,6 +280,32 @@ Exceptions and error types
 - C++ layer: throws `std::invalid_argument` or `std::runtime_error` with clear 
   messages.
 
+Performance Highlights
+----------------------
+Measured on Intel Core (3.6 GHz), Windows 11, MSVC 2022:
+
+**Zero-Copy Overhead**
+  - Small arrays (1 KB): 1.7-3.4 µs
+  - ``to_numpy`` (100 MB): 1.8 µs (size-independent!)
+  - ``from_numpy`` (100 MB): 14 ms (validation scales with size)
+  - Deep copy (100 MB): 20-23 ms
+
+**Core Operations**
+  - Element access: 745 µs per 1M ops (1000×1000 array)
+  - Memory bandwidth: 4.8-6.7 GB/s
+  - Construction overhead: ~760 ns for 100×100 arrays
+
+**vs std::vector**
+  - 2D access: CNDA 4% faster than flat vector
+  - Type safety with minimal performance penalty
+
+**Array-of-Structs (AoS)**
+  - Small structs (8-12 bytes): excellent cache performance
+  - Large structs (56+ bytes): 3-4× slower due to cache misses
+  - Struct export to NumPy: 1.8 µs for 1M elements (zero-copy)
+
+See `docs/BENCHMARKING.md <docs/BENCHMARKING.md>`_ for detailed analysis.
+
 Engineering Infrastructure
 --------------------------
 
@@ -312,14 +336,44 @@ Version control
 
 Testing
 ~~~~~~~
-- C++: Catch2 via CTest (shape/strides/index; negative cases).
-- Python: pytest with NumPy as oracle; zero-copy checks via ``ctypes.data``; 
-  dtype/contiguity validation.
+- C++: Catch2 v3.5.0 via CTest
+  - Core operations: shape/strides/index computation
+  - Bounds checking and negative cases
+  - Located in ``tests/cpp/``
+- Python: pytest with NumPy integration
+  - Zero-copy validation via ``ctypes.data``
+  - Dtype and contiguity checks
+  - Round-trip conversion tests
+  - Located in ``tests/python/``
+- Examples: 5 runnable Python examples in ``examples/``
+  - 01: Python round-trip (zero-copy basics)
+  - 02: C++ to NumPy export
+  - 03: AoS structured types
+  - 04: Zero-copy success/failure cases
+  - 05: Error handling patterns
+
+Benchmarks
+~~~~~~~~~~
+- 4 comprehensive benchmark suites:
+  - ``bench_core.cpp``: Core CNDA operations (17 tests)
+  - ``bench_comparison.cpp``: vs std::vector (5 tests)
+  - ``bench_aos.cpp``: Array-of-Structs (13 tests)
+  - ``bench_numpy_interop.py``: NumPy interop (16 tests)
+- Build with ``cmake -DCNDA_BUILD_BENCHMARKS=ON``
+- Python benchmarks require ``pytest-benchmark``
+- Automated test scripts: ``run_all_benchmarks.ps1`` (Windows) / ``.sh`` (Linux/Mac)
+- See ``docs/BENCHMARKING.md`` for detailed results and analysis
 
 Documentation
 ~~~~~~~~~~~~~
-- ``README.rst`` = proposal + quickstart; updated via PRs.
-- ``docs/`` for zero-copy policy, ownership rules, API examples.
+- ``README.rst``: This file - project overview and quick reference
+- ``docs/QUICKSTART.md``: 5-minute tutorial with architecture overview
+- ``docs/INSTALLATION.md``: Platform-specific installation guide
+- ``docs/PYTHON_USER_GUIDE.md``: Complete Python API
+- ``docs/CPP_USER_GUIDE.md``: Complete C++ API
+- ``docs/BENCHMARKING.md``: Performance benchmarks and optimization guide
+- ``docs/DESIGN.md``: Architecture and design decisions
+- ``examples/README.md``: Guide to runnable example files
 
 Schedule
 --------
